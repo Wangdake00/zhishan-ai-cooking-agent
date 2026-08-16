@@ -53,6 +53,7 @@ export function setUser(user: User): void {
 export function clearAuth(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem("thread_id");
 }
 
 /**

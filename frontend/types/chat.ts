@@ -28,6 +28,16 @@ export interface Session {
   updated_at: string;
 }
 
+// 收藏食谱
+export interface Favorite {
+  id: number;
+  title: string;
+  content: string;
+  ingredients: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Recipe {
   title: string;
   score?: number;

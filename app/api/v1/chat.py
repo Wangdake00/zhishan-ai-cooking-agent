@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from app.models.schemas import ChatRequest
 from fastapi.responses import StreamingResponse
 from app.core.auth import get_current_user
+from app.db import session_store
 from app.agents.personal_chief import (
     search_recipes,
     get_messages,
@@ -25,14 +26,20 @@ async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_c
 
 @router.get("/chat/messages")
 async def get_chat_messages(thread_id: str, current_user: dict = Depends(get_current_user)):
-    """获取历史消息"""
+    """获取历史消息（只能看自己的，越界返回空）"""
+    session = session_store.get_session(thread_id)
+    if session is None or session["user_id"] != current_user["id"]:
+        return {"messages": []}
     messages = get_messages(thread_id)
     return {"messages": messages}
 
 
 @router.delete("/chat/messages")
 async def clear_chat_messages(thread_id: str, current_user: dict = Depends(get_current_user)):
-    """清空历史消息"""
+    """清空历史消息（只能清空自己的）"""
+    session = session_store.get_session(thread_id)
+    if session is None or session["user_id"] != current_user["id"]:
+        return {"success": False, "detail": "无权操作此会话"}
     clear_messages(thread_id, current_user["id"])
     return {"success": True}
 
@@ -46,5 +53,8 @@ async def get_sessions(current_user: dict = Depends(get_current_user)):
 @router.delete("/chat/sessions/{thread_id}")
 async def delete_session_endpoint(thread_id: str, current_user: dict = Depends(get_current_user)):
     """删除指定会话（只能删自己的）"""
+    session = session_store.get_session(thread_id)
+    if session is None or session["user_id"] != current_user["id"]:
+        return {"success": False, "detail": "无权操作此会话"}
     delete_session(thread_id, current_user["id"])
     return {"success": True}

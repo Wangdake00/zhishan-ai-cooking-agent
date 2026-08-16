@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import chat
 from app.api.v1 import oss
 from app.api.v1 import auth
+from app.api.v1 import favorites
 from app.common.logger import setup_logging
 
 # 初始化日志配置
@@ -32,6 +33,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1", tags=["用户认证"])
 app.include_router(chat.router, prefix="/api/v1", tags=["对话"])
 app.include_router(oss.router, prefix="/api/v1", tags=["申请上传签名url"])
+app.include_router(favorites.router, prefix="/api/v1", tags=["收藏食谱"])
 
 # 3.挂载前端资源
 static_dir = os.path.join(os.path.dirname(__file__), "static")

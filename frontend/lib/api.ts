@@ -1,7 +1,7 @@
 /**
  * API 调用封装
  */
-import { Session } from "@/types/chat";
+import { Session, Favorite } from "@/types/chat";
 import { getAuthHeaders } from "@/lib/auth";
 import type { User } from "@/lib/auth";
 
@@ -72,29 +72,44 @@ export async function getOssPresignUrl(filename: string): Promise<{ uploadUrl: s
 
 /**
  * 上传图片到 OSS（OSS 直传，不需要认证头）
+ * 如果 OSS 未配置 / 上传失败，自动降级为 base64 数据 URL（通义千问等多模态模型支持内嵌 base64）
  */
 export async function uploadImageToOss(file: File): Promise<string> {
     // 生成文件名
     const ext = file.name.split(".").pop() || "jpg";
     const filename = `${Date.now()}.${ext}`;
 
-    // 获取预签名 URL
-    const { uploadUrl, accessUrl, contentType } = await getOssPresignUrl(filename);
+    try {
+        // 获取预签名 URL
+        const { uploadUrl, accessUrl, contentType } = await getOssPresignUrl(filename);
+        if (!uploadUrl || !accessUrl) {
+            throw new Error("OSS 预签名 URL 获取为空");
+        }
 
-    // 上传图片（PUT 到 OSS，不用带 Authorization）
-    const response = await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-            "Content-Type": contentType,
-        },
-    });
+        // 上传图片（PUT 到 OSS，不用带 Authorization）
+        const response = await fetch(uploadUrl, {
+            method: "PUT",
+            body: file,
+            headers: {
+                "Content-Type": contentType,
+            },
+        });
 
-    if (!response.ok) {
-        throw new Error(`图片上传失败: ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`图片上传失败: ${response.status}`);
+        }
+
+        return accessUrl;
+    } catch (err) {
+        // OSS 失败 fallback：转成 base64 数据 URL，直接内嵌到消息里（不依赖公网存储）
+        console.warn("OSS 上传失败，使用 base64 内嵌图片模式：", err);
+        return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("图片读取失败"));
+            reader.readAsDataURL(file);
+        });
     }
-
-    return accessUrl;
 }
 
 // ========== 聊天相关 ==========
@@ -201,4 +216,61 @@ export async function deleteSession(threadId: string): Promise<void> {
     if (!response.ok) {
         throw new Error("删除会话失败");
     }
+}
+
+// ========== 收藏食谱相关 ==========
+
+/**
+ * 列出当前用户所有收藏
+ */
+export async function listFavorites(): Promise<Favorite[]> {
+    const response = await fetch(`${API_BASE}/api/v1/favorites`, {
+        headers: withAuth(),
+    });
+    if (!response.ok) {
+        throw new Error("获取收藏列表失败");
+    }
+    const data = await response.json();
+    return data.favorites;
+}
+
+/**
+ * 获取单条收藏详情
+ */
+export async function getFavorite(favoriteId: number): Promise<Favorite> {
+    const response = await fetch(`${API_BASE}/api/v1/favorites/${favoriteId}`, {
+        headers: withAuth(),
+    });
+    if (!response.ok) {
+        throw new Error("获取收藏详情失败");
+    }
+    return await response.json();
+}
+
+/**
+ * 删除收藏
+ */
+export async function deleteFavorite(favoriteId: number): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/v1/favorites/${favoriteId}`, {
+        method: "DELETE",
+        headers: withAuth(),
+    });
+    if (!response.ok) {
+        throw new Error("删除收藏失败");
+    }
+}
+
+/**
+ * 手动创建收藏（前端直接调用）
+ */
+export async function createFavorite(title: string, content: string, ingredients: string = ""): Promise<{ id: number }> {
+    const response = await fetch(`${API_BASE}/api/v1/favorites`, {
+        method: "POST",
+        headers: withAuth({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ title, content, ingredients }),
+    });
+    if (!response.ok) {
+        throw new Error("收藏失败");
+    }
+    return await response.json();
 }

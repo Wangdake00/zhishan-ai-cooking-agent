@@ -92,3 +92,16 @@ def delete_session(thread_id: str, user_id: int) -> None:
         logger.info(f"delete_session: thread_id={thread_id}, user_id={user_id}")
     finally:
         conn.close()
+
+
+def get_session(thread_id: str) -> Optional[dict]:
+    """根据 thread_id 查询会话元数据（用于校验归属），不存在返回 None"""
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT thread_id, user_id, title, created_at, updated_at FROM sessions WHERE thread_id = ?",
+            (thread_id,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()

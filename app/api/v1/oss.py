@@ -41,15 +41,22 @@ def chat_endpoint(filename: str):
     ext = filename.split(".")[-1].lower() if "." in filename else "jpg"
     content_type = content_type_map.get(ext, "application/octet-stream")
 
-    pre_result = client.presign(oss.PutObjectRequest(
+    # 1) 预签名 PUT：给前端上传用（1 小时内有效）
+    put_result = client.presign(oss.PutObjectRequest(
         bucket=OSS_BUCKET,
         key=filename,
         content_type=content_type,
     ), expires=timedelta(seconds=3600))
 
-    # 返回上传 URL 和可访问的图片路径
+    # 2) 预签名 GET：作为图片访问 URL（7 天内有效）
+    #    即使 OSS bucket 是私有权限，带上签名也能正常被前端 & 通义千问模型读取到
+    get_result = client.presign(oss.GetObjectRequest(
+        bucket=OSS_BUCKET,
+        key=filename,
+    ), expires=timedelta(days=7))
+
     return {
-        "uploadUrl": pre_result.url.strip('"'),
+        "uploadUrl": put_result.url.strip('"'),
         "contentType": content_type,
-        "accessUrl": f"https://{OSS_BUCKET}.{OSS_ENDPOINT}/{filename}"
+        "accessUrl": get_result.url.strip('"'),
     }
