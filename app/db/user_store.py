@@ -1,13 +1,14 @@
 """
 用户数据存储
 """
+import os
 import sqlite3
 from datetime import datetime
 from typing import Optional
 
 from app.common.logger import logger
 
-DB_PATH = "db/personal_chief.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "db", "personal_chief.db")
 
 
 def _get_conn() -> sqlite3.Connection:

@@ -9,6 +9,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
 from app.db import session_store
 from app.db import favorite_store
+from app.rag.pipeline import rag_search
 import json
 import base64
 import mimetypes
@@ -415,58 +416,188 @@ model = init_chat_model(
 
 
 # 初始化checkpointer
-checkpointer = SqliteSaver(sqlite3.connect("db/personal_chief.db", check_same_thread=False))
+_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db", "personal_chief.db")
+checkpointer = SqliteSaver(sqlite3.connect(_DB_PATH, check_same_thread=False))
 checkpointer.setup()
 
-# Agent系统提示词
-system_prompt = """
-你是一名私人厨师，具备强大的 Function Calling 能力。收到用户提供的食材照片或清单后，请按以下流程操作：
 
-## 核心能力
-你拥有以下 4 个工具，请根据用户需求灵活调用：
+# ========== RAG 食谱知识库检索工具 ==========
 
-1. **web_search** (Tavily搜索)
-   - 用途：搜索互联网上的食谱、菜谱、烹饪技巧等
-   - 适用场景：用户询问菜谱、想知道某道菜怎么做、需要创意灵感时
-   - 优先级：优先使用搜索工具，搜索不到再自由发挥
+@tool
+def search_recipes_rag(query: str, top_n: int = 5) -> str:
+    """
+    从本地菜谱知识库中检索食谱（RAG 检索增强生成）。
+    支持口语化查询，会自动改写为检索关键词，通过向量召回 + Rerank 重排返回最相关的菜谱。
 
-2. **calculate_nutrition** (营养计算)
-   - 用途：计算食材/菜品的卡路里和营养成分（蛋白质、脂肪、碳水、纤维等）
-   - 适用场景：用户询问"这道菜多少卡"、"算一下营养"、"减肥能吃吗"、"营养分析"等
-   - 用法：将食材整理为"鸡胸肉200g, 西兰花150g"格式调用，份数可选
+    Args:
+        query: 用户的搜索需求，支持口语化表达。如"清淡的"、"减脂餐"、"鸡肉做法"、"川菜下饭"
+        top_n: 返回的菜谱数量，默认5条
 
-3. **generate_shopping_list** (生成购物清单)
-   - 用途：根据食谱生成分类整理的购物清单，自动估算采购量
-   - 适用场景：用户说"帮我列购物清单"、"需要买什么"、"采购单"等
-   - 用法：将食谱食材传入，份数按用户需求调整
+    Returns:
+        检索到的菜谱列表，包含菜名、菜系、食材、做法、营养信息等
+    """
+    logger.info(f"[工具调用] search_recipes_rag: query={query}, top_n={top_n}")
+    try:
+        result = rag_search(query, top_k=10, top_n=top_n)
+        recipes = result["results"]
 
-4. **save_favorite_recipe** (收藏食谱)
-   - 用途：将用户喜欢的食谱保存到个人收藏夹
-   - 适用场景：用户说"收藏这个食谱"、"我要保存这道菜"、"加入收藏"等
-   - 用法：必须获取用户的明确意图才能调用，不要自动收藏。recipe_content 传入食谱的完整做法和步骤，ingredients 传入主要食材列表。
+        if not recipes:
+            return "本地知识库中没有找到相关菜谱，建议使用 web_search 搜索互联网。"
+
+        # 构建结构化输出
+        lines = [f"🔍 RAG 检索完成，找到 {len(recipes)} 道相关菜谱：\n"]
+        pipeline_info = " → ".join(result["pipeline_log"])
+        if result["fallback_used"]:
+            lines.append(f"⚠️ 检索链路使用了 Fallback 降级\n")
+        lines.append(f"📋 检索管道: {pipeline_info}\n")
+
+        for i, recipe in enumerate(recipes, 1):
+            rerank_score = recipe.get("rerank_score", 0)
+            lines.append(f"{'='*50}")
+            lines.append(f"{i}. {recipe['name']}  (Rerank分数: {rerank_score})")
+            lines.append(f"   菜系: {recipe['cuisine']} | 难度: {recipe['difficulty']} | 时间: {recipe['cooking_time']}")
+            lines.append(f"   食材: {recipe['ingredients']}")
+            lines.append(f"   标签: {recipe['tags']}")
+            lines.append(f"   营养(每份): {recipe['nutrition']}")
+            lines.append(f"   做法:\n{recipe['steps']}")
+            lines.append(f"   简介: {recipe['description']}\n")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.error(f"[RAG] search_recipes_rag 工具执行失败: {e}")
+        return f"RAG 检索失败: {str(e)}\n建议使用 web_search 搜索互联网。"
+
+
+# ========== 意图检测 ==========
+
+def detect_user_intent(message: str) -> str:
+    """
+    检测用户意图：
+    - "nutrition": 卡路里/营养分析
+    - "recipe": 菜谱推荐/做什么菜
+    - "general": 通用对话（智能模式，让 Agent 自主决策）
+    """
+    nutrition_kw = ["卡路里", "热量", "营养", "多少卡", "蛋白质", "脂肪", "碳水",
+                    "算一下", "计算", "分析营养", "热量多少", "营养成分", "健康吗", "减脂", "增肌"]
+    recipe_kw = ["做什么菜", "菜谱", "推荐菜", "能做", "怎么做", "做什么", "食谱",
+                 "烧什么", "炒什么", "炖什么", "做法", "烹饪", "搭配", "菜谱推荐"]
+
+    for kw in nutrition_kw:
+        if kw in message:
+            return "nutrition"
+    for kw in recipe_kw:
+        if kw in message:
+            return "recipe"
+    return "general"
+
+
+# ========== 动态 System Prompt ==========
+
+SYSTEM_PROMPTS = {
+    "recipe": """
+你是一名私人厨师，专注于**根据食材推荐菜谱**。收到用户提供的食材照片或描述后，请按以下流程操作：
+
+## 你的角色
+- 你是「菜谱推荐专家」，核心任务是：从用户提供的食材出发，推荐最合适的菜谱
+- 优先调用 **search_recipes_rag** (RAG 本地知识库检索) ⭐
+
+## 工具使用优先级
+0. **search_recipes_rag** ⭐ 最高优先级：从本地 52 道经典菜谱中检索
+1. **web_search**：本地知识库搜不到时再用
+2. **calculate_nutrition**：用户问营养时调用
+3. **generate_shopping_list**：用户问购物清单时调用
+4. **save_favorite_recipe**：用户明确说"收藏"时调用
 
 ## 工作流程
-1. 识别和评估食材：若用户提供照片，首先辨识所有可见食材。基于食材的外观状态，评估其新鲜度与可用量，整理出一份"当前可用食材清单"。
-2. 智能食谱检索：优先调用 web_search 工具，以"可用食材清单"为核心关键词，查找可行菜谱。
-3. 多维度评估与排序：从营养价值和制作难度两个维度对检索到的候选食谱进行量化打分，并根据得分排序，制作简单且营养丰富的排名靠前。
-4. 结构化方案输出：把排序后的食谱整理为一份结构清晰的建议报告，要包含食谱信息、得分、推荐理由、食谱的参考图片，帮助用户快速做出决策。
-5. 增值服务：根据用户需求，灵活调用营养计算、购物清单生成、食谱收藏等工具提供更多价值。
+1. **识别食材**：若有照片，先识别所有可见食材，整理出"可用食材清单"
+2. **RAG 检索**：⭐ 优先调用 search_recipes_rag，以"可用食材 + 口味偏好"为查询
+3. **补充搜索**：RAG 结果不足时，再用 web_search
+4. **排序推荐**：从「食材匹配度 + 难度 + 营养」三维评分排序
+5. **输出报告**：结构清晰的推荐，包含菜名、食材、做法、营养、推荐理由
 
 ## 注意事项
-- 请严格按照流程，优先调用 web_search 工具搜索食谱，搜索不到的情况下才能自己发挥。
-- 每次调用工具后，把工具返回的结果用友好的中文总结给用户。
-- 同一个回答中可以多次调用不同工具（例如：先搜索食谱，再计算营养，最后生成购物清单）。
-- ⚠️ **强烈注意（避免幻觉）**：调用 generate_shopping_list 或 calculate_nutrition 前，请把食材数量换算为"1 人份的合理用量"，再按份数传给 servings 参数。常见食材的 1 人份常识用量参考：
-  - 鸡蛋：1.5~3 个 / 人份（1 人份西红柿炒鸡蛋大约用 2 个鸡蛋，不要报 8 个以上）
-  - 西红柿：1 个左右 / 人份（约 150~200g）
-  - 肉类（鸡胸/鸡腿/猪牛/鱼虾）：生重 80~180g / 人份
-  - 叶菜（西兰花/青菜/菠菜/白菜）：80~200g / 人份
-  - 主食（大米/面条/米饭）：80~150g 生米或 150~250g 熟饭 / 人份
-  - 豆腐：80~200g / 人份
-  - 土豆/胡萝卜/黄瓜：0.5~1.5 个 / 人份
-  - 大蒜/葱：1~3 瓣或 1~2 根 / 整道菜（不要按人份倍增）
-  - 调料（盐/生抽/油/糖/料酒）：按整道菜适量写，不要按人份倍增（例如 1 勺就是 1 勺，不要乘 3）
-"""
+- ⚠️ **避免幻觉**：调用 calculate_nutrition / generate_shopping_list 前，将食材换算为"1 人份合理用量"：
+  - 鸡蛋 1.5~3 个、西红柿 1 个、肉类 80~180g、叶菜 80~200g、主食 80~150g
+  - 调料按整道菜适量，不要按人份倍增
+- 每次工具调用后，用中文友好总结结果
+- 可多次调用不同工具（如：先 RAG 检索 → 再计算营养 → 最后生成清单）
+""",
+
+    "nutrition": """
+你是一名**营养分析师**，专注于分析食材/菜品的营养成分和热量。收到用户提供的照片或描述后，请按以下流程操作：
+
+## 你的角色
+- 你是「营养健康专家」，核心任务是：精准分析卡路里、蛋白质、脂肪、碳水等营养指标
+- 优先调用 **calculate_nutrition** 进行营养计算
+
+## 工具使用优先级
+0. **calculate_nutrition** ⭐ 最高优先级：计算营养成分
+1. **search_recipes_rag**：用户问相关菜谱时调用
+2. **web_search**：补充搜索营养知识
+3. **generate_shopping_list**：用户问购物清单时调用
+4. **save_favorite_recipe**：用户明确说"收藏"时调用
+
+## 工作流程
+1. **识别食材/菜品**：若有照片，识别照片中的食材或菜品，估算各食材的用量
+2. **营养计算**：⭐ 优先调用 calculate_nutrition，传入识别到的食材和用量
+3. **营养评估**：根据计算结果，给出健康建议（热量是否超标、蛋白质是否充足等）
+4. **优化建议**：如果热量/营养不合理，给出改善方案
+
+## 输出格式
+请使用以下结构输出：
+### 📊 营养成分分析报告
+- 各食材营养明细表格
+- 营养汇总（总卡路里/蛋白质/脂肪/碳水/纤维）
+- 营养建议（是否均衡、健康提示）
+
+## 注意事项
+- ⚠️ **精准估算**：识别照片食材时，合理估算用量（如一碗米饭约 150g、一个鸡蛋约 50g）
+- 如无法精准识别用量，请告知用户"建议称重后获得更准确数据"
+- 可多次调用 calculate_nutrition 分别计算不同食材
+""",
+
+    "general": """
+你是一名全能私人厨师，具备强大的 Function Calling 和 RAG 检索增强生成能力。请根据用户需求灵活选择工具：
+
+## 核心能力
+你拥有以下 5 个工具，请根据用户需求灵活调用：
+
+0. **search_recipes_rag** (RAG 本地知识库检索) ⭐ 优先使用
+   - 用途：从本地菜谱知识库（52 道经典菜谱）中检索食谱
+   - 技术原理：Query 改写 → 向量召回(ChromaDB) → Rerank 重排 → Fallback 降级
+
+1. **web_search** (Tavily 搜索)
+   - 用途：搜索互联网上的食谱、烹饪技巧等
+   - 优先级：RAG 查不到再用
+
+2. **calculate_nutrition** (营养计算)
+   - 用途：计算食材/菜品的卡路里和营养成分
+   - 用法："鸡胸肉200g, 西兰花150g"格式
+
+3. **generate_shopping_list** (购物清单)
+   - 用途：根据食谱生成分类整理的购物清单
+
+4. **save_favorite_recipe** (收藏食谱)
+   - 用途：保存食谱到个人收藏夹
+
+## 工作流程（根据用户意图自适应）
+- 用户上传照片问"能做什么菜" → 识别食材 → RAG 检索 → 推荐菜谱
+- 用户上传照片问"多少卡" → 识别食材/菜品 → 计算营养 → 健康建议
+- 用户描述食材 → RAG 检索菜谱 → 推荐
+- 用户问营养 → calculate_nutrition → 分析
+
+## 注意事项
+- ⚠️ **避免幻觉**：调用 calculate_nutrition / generate_shopping_list 前，将食材换算为"1 人份合理用量"
+- 每次工具调用后，用中文友好总结
+- 可多次调用不同工具组合完成任务
+""",
+}
+
+
+def get_system_prompt(intent: str) -> str:
+    """根据意图获取对应的 System Prompt"""
+    return SYSTEM_PROMPTS.get(intent, SYSTEM_PROMPTS["general"])
 
 
 # ========== save_favorite_recipe 需要 user_id，动态注入到工具 ==========
@@ -502,18 +633,21 @@ def make_save_favorite_tool(user_id: int):
 
 
 # 默认工具列表（不含绑定 user_id 的收藏工具）
-default_tools = [tavily, calculate_nutrition, generate_shopping_list]
+# search_recipes_rag 优先级最高，Agent 应先查本地知识库再用 web_search
+default_tools = [search_recipes_rag, tavily, calculate_nutrition, generate_shopping_list]
 
 
-def build_agent_for_user(user_id: int):
-    """为指定用户构建 Agent（注入绑定了 user_id 的收藏工具）"""
+def build_agent_for_user(user_id: int, intent: str = "general"):
+    """为指定用户构建 Agent（注入绑定了 user_id 的收藏工具 + 动态意图 prompt）"""
     user_save_tool = make_save_favorite_tool(user_id)
     user_tools = default_tools + [user_save_tool]
+    prompt = get_system_prompt(intent)
+    logger.info(f"[Agent] 构建 Agent，意图: {intent}")
     return create_agent(
         model=model,
         tools=user_tools,
         checkpointer=checkpointer,
-        system_prompt=system_prompt
+        system_prompt=prompt
     )
 
 
@@ -522,42 +656,72 @@ agent = create_agent(
     model=model,
     tools=default_tools,
     checkpointer=checkpointer,
-    system_prompt=system_prompt
+    system_prompt=get_system_prompt("general")
 )
 
+
 # 流式对话
-async def search_recipes(prompt: str, image: str, thread_id: str, user_id: int):
-    """调用agent搜索食谱"""
+async def search_recipes(prompt: str, image_urls: list, thread_id: str, user_id: int):
+    """
+    调用 agent 搜索食谱 / 分析营养
+    
+    Args:
+        prompt: 用户输入的文本
+        image_urls: 图片 URL 列表（支持多张）
+        thread_id: 会话 ID
+        user_id: 用户 ID
+    """
     import traceback
-    logger.info(f"[用户]: {prompt}, image: {image and len(image)} bytes, thread_id: {thread_id}, user_id: {user_id}")
-    # 用第一条用户消息作为会话标题（已存在的会话不会被覆盖标题，只刷新时间）
-    session_store.upsert_session(thread_id, user_id=user_id, title=(prompt or "上传了一张食材图片")[:30])
+    logger.info(f"[用户]: {prompt}, images: {len(image_urls or [])}张, thread_id: {thread_id}, user_id: {user_id}")
+    
+    # 用第一条用户消息作为会话标题
+    session_store.upsert_session(thread_id, user_id=user_id, title=(prompt or "上传了图片")[:30])
+    
+    # 1. 意图检测
+    intent = detect_user_intent(prompt)
+    logger.info(f"[Agent] 检测到用户意图: {intent}")
+    
     try:
-        # 构建绑定用户的 Agent（包含收藏功能）
-        user_agent = build_agent_for_user(user_id)
+        # 2. 构建绑定用户的 Agent（带意图 prompt）
+        user_agent = build_agent_for_user(user_id, intent)
 
-        # 判断是否有图片，封装不同格式的消息
-        # ⚠️ 通义千问 OpenAI 兼容模式需要标准 message content block 格式：
-        #    { "type": "image_url", "image_url": { "url": "data:image/jpeg;base64,xxxx" } }
-        # 为避免「通义服务器无法下载 OSS/内网图片 → 报 400 Failed to download multimodal content」：
-        # 后端先把 URL 图片下载下来转 base64 内嵌，再传给模型
-        if not image or image.strip() == "":
-            message = HumanMessage(content=prompt)
+        # 3. 构造多模态消息（支持多图）
+        content_blocks = []
+        
+        # 处理图片（支持多张）
+        if image_urls:
+            for img_url in image_urls:
+                if img_url and img_url.strip():
+                    img_data_url = await _ensure_image_base64_data_url(img_url)
+                    content_blocks.append({
+                        "type": "image_url",
+                        "image_url": {"url": img_data_url},
+                    })
+
+        # 文本提示
+        if not prompt or prompt.strip() == "":
+            if image_urls:
+                # 根据意图给默认提示词
+                default_prompts = {
+                    "nutrition": "请识别这些图片中的食材或菜品，分析营养成分和热量",
+                    "recipe": "请识别这些图片中的食材，推荐能做的菜谱",
+                    "general": "请识别这些图片中的食材，并给出建议",
+                }
+                user_prompt = default_prompts.get(intent, default_prompts["general"])
+            else:
+                user_prompt = "你好"
         else:
-            user_prompt = prompt or "请识别这张图片里有哪些食材，并基于这些食材推荐合适的菜谱。"
-            image_data_url = await _ensure_image_base64_data_url(image)
-            message = HumanMessage(content=[
-                {
-                    "type": "image_url",
-                    "image_url": {"url": image_data_url},
-                },
-                {
-                    "type": "text",
-                    "text": user_prompt,
-                },
-            ])
+            user_prompt = prompt
 
-        # 流式调用Agent
+        content_blocks.append({
+            "type": "text",
+            "text": user_prompt,
+        })
+
+        # 构建 HumanMessage
+        message = HumanMessage(content=content_blocks)
+
+        # 4. 流式调用 Agent
         for chunk, metadata in user_agent.stream(
             {"messages": [message]},
             {"configurable": {"thread_id": thread_id}},
@@ -570,11 +734,11 @@ async def search_recipes(prompt: str, image: str, thread_id: str, user_id: int):
         tb = traceback.format_exc()
         logger.error(f"\n[错误] 调用Agent失败: {str(e)}\n{tb}")
         yield (
-            f"😢 图片识别或菜谱生成失败：{str(e)}\n\n"
+            f"😢 处理请求失败：{str(e)}\n\n"
             "请检查：\n"
             "1. 图片格式是否为 jpg/png/webp 等常见格式\n"
             "2. DASHSCOPE_API_KEY 是否有效且支持多模态模型 qwen3.5-plus\n"
-            "3. 图片大小建议 < 5MB，过大可能上传失败\n"
+            "3. 图片大小建议 < 5MB/张，过大可能上传失败\n"
         )
 
 

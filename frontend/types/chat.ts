@@ -6,15 +6,16 @@ export type MessageRole = "user" | "assistant" | "system";
 
 // 多模态消息内容项
 export type MessageContentPart =
-    | { type: "text"; text: string }
-    | { type: "image"; url: string };
+  | { type: "text"; text: string }
+  | { type: "image"; url: string };
 
 export interface Message {
   id: string;
   role: MessageRole;
   content: string;
   contentParts?: MessageContentPart[]; // 多模态内容
-  imageUrl?: string; // 兼容旧版
+  imageUrl?: string; // 兼容旧版单图
+  imageUrls?: string[]; // 新版多图
   timestamp: number;
   loading?: boolean;
   streaming?: boolean; // 是否正在流式输出

@@ -242,19 +242,21 @@ export default function Home() {
         return newMessage;
     };
 
-    // 处理发送消息
-    const handleSend = async (text: string, file?: File) => {
+    // 处理发送消息（支持多图）
+    const handleSend = async (text: string, files?: File[]) => {
         if (processing) return;
 
-        let imageUrl: string | undefined;
-        if (file) {
+        let imageUrls: string[] = [];
+        if (files && files.length > 0) {
             try {
-                imageUrl = await uploadImageToOss(file);
+                // 批量上传图片到 OSS
+                const uploadPromises = files.map(f => uploadImageToOss(f));
+                imageUrls = await Promise.all(uploadPromises);
             } catch (error) {
                 console.error("图片上传失败:", error);
                 addMessage({
                     role: "assistant",
-                    content: "图片上传失败，请稍后重试。",
+                    content: "部分图片上传失败，请重试或减少图片数量。",
                 });
                 return;
             }
@@ -265,8 +267,9 @@ export default function Home() {
 
         addMessage({
             role: "user",
-            content: text || "上传了一张食材图片",
-            imageUrl,
+            content: text || (imageUrls.length > 0 ? `上传了 ${imageUrls.length} 张图片` : "你好"),
+            imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+            imageUrl: imageUrls.length === 1 ? imageUrls[0] : undefined, // 兼容单图
         });
 
         setProcessing(true);
@@ -279,7 +282,7 @@ export default function Home() {
 
         try {
             await streamChat(
-                text || "这是我冰箱里的食物，帮我看看能做什么佳肴？",
+                text || "",
                 (chunk) => {
                     setMessages((prev) =>
                         prev.map((msg) =>
@@ -288,7 +291,8 @@ export default function Home() {
                                 : msg
                         )
                     );
-                }, imageUrl,
+                },
+                imageUrls.length > 0 ? imageUrls : undefined,
                 (error) => {
                     console.error("聊天失败:", error);
                     setMessages((prev) =>
@@ -312,7 +316,6 @@ export default function Home() {
                         )
                     );
                     refreshSessions();
-                    // 聊天完成后也刷新一下收藏，避免有新收藏没显示
                     setTimeout(refreshFavorites, 300);
                 },
                 threadId

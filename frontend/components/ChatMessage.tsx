@@ -43,7 +43,21 @@ export function ChatMessage({message}: ChatMessageProps) {
                             : "bg-white/90 text-gray-800 border border-gray-100"
                     }`}
                 >
-                    {message.imageUrl && (
+                    {/* 多图展示 */}
+                    {(message.imageUrls && message.imageUrls.length > 0) && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                            {message.imageUrls.map((url, idx) => (
+                                <img
+                                    key={idx}
+                                    src={url}
+                                    alt={`图片${idx + 1}`}
+                                    className="rounded-lg max-w-32 max-h-32 object-cover"
+                                />
+                            ))}
+                        </div>
+                    )}
+                    {/* 单图兼容 */}
+                    {!message.imageUrls && message.imageUrl && (
                         <img
                             src={message.imageUrl}
                             alt="上传的图片"

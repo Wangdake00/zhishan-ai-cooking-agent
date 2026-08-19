@@ -4,13 +4,14 @@
 独立于 LangGraph 的 SqliteSaver，单独维护一张 sessions 表，
 用于列出所有会话、记录标题与更新时间，避免依赖 checkpointer 的内部表结构。
 """
+import os
 import sqlite3
 from datetime import datetime
 from typing import Optional
 
 from app.common.logger import logger
 
-DB_PATH = "db/personal_chief.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "db", "personal_chief.db")
 
 
 def _get_conn() -> sqlite3.Connection:

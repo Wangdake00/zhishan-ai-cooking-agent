@@ -115,12 +115,12 @@ export async function uploadImageToOss(file: File): Promise<string> {
 // ========== 聊天相关 ==========
 
 /**
- * 流式聊天
+ * 流式聊天（支持多图）
  */
 export async function streamChat(
     message: string,
     onChunk: (chunk: string) => void,
-    image_url?: string,
+    image_urls?: string[],
     onError?: (error: Error) => void,
     onComplete?: () => void,
     threadId?: string
@@ -132,7 +132,7 @@ export async function streamChat(
             method: "POST",
             body: JSON.stringify({
                 message,
-                image_url: image_url,
+                image_urls: image_urls || [],
                 thread_id: threadId,
             }),
             headers: withAuth({ "Content-Type": "application/json" }),

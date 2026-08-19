@@ -28,5 +28,5 @@ class TokenResponse(BaseModel):
 # --- 聊天相关模型 ---
 class ChatRequest(BaseModel):
     message: str
-    image_url: Optional[str] = None
+    image_urls: Optional[List[str]] = None  # 支持多张图片 URL
     thread_id: str

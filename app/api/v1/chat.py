@@ -17,9 +17,9 @@ router = APIRouter()
 
 @router.post("/chat/stream")
 async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_current_user)):
-    """流式对话"""
+    """流式对话（支持多图）"""
     return StreamingResponse(
-        search_recipes(request.message, request.image_url, request.thread_id, current_user["id"]),
+        search_recipes(request.message, request.image_urls or [], request.thread_id, current_user["id"]),
         media_type="text/event-stream"
     )
 
