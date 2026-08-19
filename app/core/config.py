@@ -1,9 +1,13 @@
 """
 智膳 AI 统一配置管理
 使用 Pydantic Settings 实现类型安全的环境变量管理。
+所有路径均基于项目根目录解析为绝对路径，避免因工作目录不同导致的数据文件错位。
 """
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 项目根目录（app/core/config.py → 上溯两级 = 项目根）
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
@@ -55,16 +59,18 @@ class Settings(BaseSettings):
     oss_endpoint: str = "oss-cn-shenzhen.aliyuncs.com"
 
     # ========== 数据库 ==========
-    db_dir: str = "db"
+    db_dir: str = "app/db"
     db_name: str = "personal_chief"
 
     @property
     def db_path(self) -> Path:
-        return Path(self.db_dir) / f"{self.db_name}.db"
+        """SQLite 数据库绝对路径（会话 + checkpointer 共用）"""
+        return _PROJECT_ROOT / self.db_dir / f"{self.db_name}.db"
 
     @property
     def chroma_db_path(self) -> Path:
-        return Path(self.chroma_db_dir)
+        """ChromaDB 向量库绝对路径"""
+        return _PROJECT_ROOT / self.chroma_db_dir
 
     @property
     def is_production(self) -> bool:

@@ -13,7 +13,7 @@ from app.core.exceptions import (
     AuthException,
     UsernameExistsException,
 )
-from app.db import user_store
+from app.db import user_store, session_store
 from app.models.schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse
 
 router = APIRouter()
@@ -27,6 +27,12 @@ async def register(request: RegisterRequest):
 
     password_hash = hash_password(request.password)
     user = user_store.create_user(request.username, password_hash)
+
+    # 将孤儿会话（user_id 指向不存在用户）关联到新注册用户
+    assigned = session_store.assign_orphan_sessions_to_user(user["id"])
+    if assigned > 0:
+        from app.common.logger import logger
+        logger.info(f"新用户 {request.username} 注册，已关联 {assigned} 条历史会话")
 
     token = create_access_token(user["id"], user["username"])
     return TokenResponse(
@@ -45,6 +51,14 @@ async def login(request: LoginRequest):
     user = user_store.get_user_by_username(request.username)
     if not user or not verify_password(request.password, user["password_hash"]):
         raise AuthException(message="用户名或密码错误")
+
+    # 如果当前用户没有会话，尝试关联孤儿会话
+    existing_sessions = session_store.list_sessions(user["id"])
+    if len(existing_sessions) == 0:
+        assigned = session_store.assign_orphan_sessions_to_user(user["id"])
+        if assigned > 0:
+            from app.common.logger import logger
+            logger.info(f"用户 {request.username} 登录，已关联 {assigned} 条历史会话")
 
     token = create_access_token(user["id"], user["username"])
     return TokenResponse(

@@ -107,3 +107,32 @@ def get_session(thread_id: str) -> Optional[dict]:
         return dict(row) if row else None
     finally:
         conn.close()
+
+
+def assign_orphan_sessions_to_user(user_id: int) -> int:
+    """
+    将所有 user_id 指向无效用户的会话（孤儿会话）关联到指定用户。
+    返回被更新的会话数量。
+    """
+    conn = _get_conn()
+    try:
+        # 找出所有 user_id 指向不存在用户的会话
+        orphan = conn.execute("""
+            SELECT s.thread_id FROM sessions s
+            WHERE s.user_id IS NOT NULL
+            AND s.user_id NOT IN (SELECT id FROM users)
+        """).fetchall()
+        
+        if orphan:
+            thread_ids = [row["thread_id"] for row in orphan]
+            placeholders = ",".join(["?"] * len(thread_ids))
+            conn.execute(
+                f"UPDATE sessions SET user_id = ? WHERE thread_id IN ({placeholders})",
+                [user_id] + thread_ids
+            )
+            conn.commit()
+            logger.info(f"assign_orphan_sessions_to_user: {len(thread_ids)} sessions assigned to user_id={user_id}")
+            return len(thread_ids)
+        return 0
+    finally:
+        conn.close()
