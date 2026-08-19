@@ -7,6 +7,8 @@ from app.common.logger import logger
 import os
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
+from app.core.config import settings
+from app.core.exceptions import RAGException, AgentToolException, ExternalServiceException
 from app.db import session_store
 from app.db import favorite_store
 from app.rag.pipeline import rag_search
@@ -18,14 +20,11 @@ import urllib.parse
 import ssl
 from typing import Optional
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 # web搜索工具，使用tavily作为web搜索工具
 tavily = TavilySearch(
     max_results=5,
-    topic="general"
+    topic="general",
+    tavily_api_key=settings.tavily_api_key or "dummy-key-for-dev"
 )
 
 
@@ -408,15 +407,15 @@ def generate_shopping_list(ingredients: str, servings: Optional[int] = 1) -> str
 
 # 多模态模型
 model = init_chat_model(
-    model="qwen3.5-plus",
+    model=settings.llm_model,
     model_provider="openai",
-    base_url=os.getenv("DASHSCOPE_BASE_URL"),
-    api_key=os.getenv("DASHSCOPE_API_KEY")
+    base_url=settings.dashscope_base_url,
+    api_key=settings.dashscope_api_key
 )
 
 
 # 初始化checkpointer
-_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db", "personal_chief.db")
+_DB_PATH = str(settings.db_path)
 checkpointer = SqliteSaver(sqlite3.connect(_DB_PATH, check_same_thread=False))
 checkpointer.setup()
 
@@ -466,7 +465,7 @@ def search_recipes_rag(query: str, top_n: int = 5) -> str:
 
     except Exception as e:
         logger.error(f"[RAG] search_recipes_rag 工具执行失败: {e}")
-        return f"RAG 检索失败: {str(e)}\n建议使用 web_search 搜索互联网。"
+        raise RAGException(message=f"RAG 检索失败: {str(e)}", detail=str(e))
 
 
 # ========== 意图检测 ==========
@@ -737,7 +736,7 @@ async def search_recipes(prompt: str, image_urls: list, thread_id: str, user_id:
             f"😢 处理请求失败：{str(e)}\n\n"
             "请检查：\n"
             "1. 图片格式是否为 jpg/png/webp 等常见格式\n"
-            "2. DASHSCOPE_API_KEY 是否有效且支持多模态模型 qwen3.5-plus\n"
+            f"2. DASHSCOPE_API_KEY 是否有效且支持多模态模型 {settings.llm_model}\n"
             "3. 图片大小建议 < 5MB/张，过大可能上传失败\n"
         )
 
@@ -787,7 +786,7 @@ async def _ensure_image_base64_data_url(image_src: str) -> str:
         ctx = ssl._create_unverified_context()
         req = urllib.request.Request(
             image_src,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; AIPrivateChef/1.0)"},
+            headers={"User-Agent": f"Mozilla/5.0 (compatible; ZhiShanAI/1.0)"},
         )
         with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
             raw = resp.read()

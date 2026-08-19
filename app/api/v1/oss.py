@@ -2,35 +2,26 @@ import alibabacloud_oss_v2 as oss
 from fastapi import APIRouter
 from datetime import timedelta
 import os
-# 加载环境变量
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.config import settings
+
+# 将配置写入环境变量（OSS SDK 通过环境变量读取）
+os.environ["OSS_ACCESS_KEY_ID"] = settings.oss_access_key_id
+os.environ["OSS_ACCESS_KEY_SECRET"] = settings.oss_access_key_secret
+
 router = APIRouter()
 
-# 从环境变量中加载凭证信息，用于身份验证
 credentials_provider = oss.credentials.EnvironmentVariableCredentialsProvider()
 
-# 加载SDK的默认配置，并设置凭证提供者
 cfg = oss.config.load_default()
 cfg.credentials_provider = credentials_provider
+cfg.region = settings.oss_region
 
-# OSS 域名与 Region 配置（二者必须对应同一个地域，否则预签名会校验失败）
-OSS_REGION = os.getenv("OSS_REGION", "cn-shenzhen")
-OSS_ENDPOINT = os.getenv("OSS_ENDPOINT", "oss-cn-shenzhen.aliyuncs.com")
-OSS_BUCKET = os.getenv("OSS_BUCKET")
-
-# 必须指定Region ID，SDK会根据Region自动构造HTTPS访问域名
-# Region 要和 OSS_ENDPOINT 所在地域一致，否则预签名URL会被OSS拒绝
-cfg.region = OSS_REGION
-
-# 使用配置好的信息创建OSS客户端
 client = oss.Client(cfg)
 
 
 @router.get("/oss/presign")
 def chat_endpoint(filename: str):
-    # 根据文件扩展名判断 Content-Type
     content_type_map = {
         "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
@@ -41,17 +32,14 @@ def chat_endpoint(filename: str):
     ext = filename.split(".")[-1].lower() if "." in filename else "jpg"
     content_type = content_type_map.get(ext, "application/octet-stream")
 
-    # 1) 预签名 PUT：给前端上传用（1 小时内有效）
     put_result = client.presign(oss.PutObjectRequest(
-        bucket=OSS_BUCKET,
+        bucket=settings.oss_bucket,
         key=filename,
         content_type=content_type,
     ), expires=timedelta(seconds=3600))
 
-    # 2) 预签名 GET：作为图片访问 URL（7 天内有效）
-    #    即使 OSS bucket 是私有权限，带上签名也能正常被前端 & 通义千问模型读取到
     get_result = client.presign(oss.GetObjectRequest(
-        bucket=OSS_BUCKET,
+        bucket=settings.oss_bucket,
         key=filename,
     ), expires=timedelta(days=7))
 

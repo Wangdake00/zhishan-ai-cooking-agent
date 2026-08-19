@@ -1,7 +1,11 @@
+"""
+对话路由：流式对话、会话管理、消息历史
+"""
 from fastapi import APIRouter, Depends
 from app.models.schemas import ChatRequest
 from fastapi.responses import StreamingResponse
 from app.core.auth import get_current_user
+from app.core.exceptions import PermissionDeniedException
 from app.db import session_store
 from app.agents.personal_chief import (
     search_recipes,
@@ -39,7 +43,7 @@ async def clear_chat_messages(thread_id: str, current_user: dict = Depends(get_c
     """清空历史消息（只能清空自己的）"""
     session = session_store.get_session(thread_id)
     if session is None or session["user_id"] != current_user["id"]:
-        return {"success": False, "detail": "无权操作此会话"}
+        raise PermissionDeniedException("无权操作此会话")
     clear_messages(thread_id, current_user["id"])
     return {"success": True}
 
@@ -55,6 +59,6 @@ async def delete_session_endpoint(thread_id: str, current_user: dict = Depends(g
     """删除指定会话（只能删自己的）"""
     session = session_store.get_session(thread_id)
     if session is None or session["user_id"] != current_user["id"]:
-        return {"success": False, "detail": "无权操作此会话"}
+        raise PermissionDeniedException("无权操作此会话")
     delete_session(thread_id, current_user["id"])
     return {"success": True}

@@ -2,7 +2,7 @@
 多阶段 RAG 检索管道
 Pipeline: Query 改写 → 向量召回 → Rerank 重排 → Fallback 降级
 
-设计理念（对标简历项目要求）：
+设计理念：
 - 每个阶段都有独立的 Fallback 降级方案，保证全链路可用性
 - Query 改写失败 → 用原始 query
 - 向量召回失败 → 降级为关键字匹配
@@ -14,35 +14,23 @@ import os
 import json
 from typing import List, Dict, Optional
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.common.logger import logger
+from app.core.config import settings
 from app.rag.vector_store import get_collection
 from app.rag.recipe_data import RECIPES
 
 
-# ========== 从环境变量读取配置 ==========
+# ========== 从统一配置读取 ==========
 
-# LLM 模型名称（用于 Query 改写）
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen3.5-plus")
-
-# Rerank 模型名称
-RERANK_MODEL = os.getenv("RERANK_MODEL", "gte-rerank")
-
-# 向量召回 Top-K
-RAG_TOP_K = int(os.getenv("RAG_TOP_K", "10"))
-
-# Rerank 后返回 Top-N
-RAG_TOP_N = int(os.getenv("RAG_TOP_N", "5"))
-
-# DashScope API 配置
-DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
-DASHSCOPE_BASE_URL = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+LLM_MODEL = settings.llm_model
+RERANK_MODEL = settings.rerank_model
+RAG_TOP_K = settings.rag_top_k
+RAG_TOP_N = settings.rag_top_n
+DASHSCOPE_API_KEY = settings.dashscope_api_key
+DASHSCOPE_BASE_URL = settings.dashscope_base_url
 
 
 # ========== 初始化 LLM（用于 Query 改写）==========
@@ -69,11 +57,6 @@ def rewrite_query(user_query: str) -> Dict[str, str]:
     """
     将用户的口语化 query 改写为检索友好的关键词
 
-    示例：
-    - "今天天好热想吃点清淡的" → "清淡 凉菜 清蒸 夏日 低卡"
-    - "冰箱里有鸡肉和土豆怎么做" → "鸡肉 土豆 家常菜 炖菜 炒菜"
-    - "减肥期间能吃什么肉" → "减脂 低卡 高蛋白 鸡胸肉 鱼肉 清蒸 水煮"
-
     Returns:
         {"original": 原始query, "rewritten": 改写后query, "keywords": 关键词列表}
     """
@@ -97,7 +80,6 @@ def rewrite_query(user_query: str) -> Dict[str, str]:
         response = model.invoke(messages)
         rewritten = response.content.strip()
 
-        # 简单校验：如果改写结果太短或为空，回退到原始 query
         if len(rewritten) < 2:
             logger.warning(f"[RAG] Query 改写结果过短，回退到原始 query: {user_query}")
             rewritten = user_query
@@ -116,10 +98,6 @@ def rewrite_query(user_query: str) -> Dict[str, str]:
 def vector_recall(query_text: str, top_k: int = 10) -> List[Dict]:
     """
     使用 ChromaDB 语义检索召回 Top-K 菜谱
-
-    Returns:
-        [{"id", "name", "cuisine", "ingredients", "steps", "nutrition",
-          "tags", "description", "difficulty", "cooking_time", "score"}]
     """
     try:
         collection = get_collection()
@@ -137,7 +115,6 @@ def vector_recall(query_text: str, top_k: int = 10) -> List[Dict]:
         for i, recipe_id in enumerate(results["ids"][0]):
             meta = results["metadatas"][0][i]
             distance = results["distances"][0][i]
-            # ChromaDB 返回的是 distance（越小越相似），转换为相似度分数
             similarity = max(0.0, 1.0 - distance / 2.0)
 
             recipes.append({
@@ -165,16 +142,12 @@ def vector_recall(query_text: str, top_k: int = 10) -> List[Dict]:
 # ========== Stage 2 Fallback: 关键字匹配 ==========
 
 def keyword_recall(keywords: List[str], top_k: int = 10) -> List[Dict]:
-    """
-    Fallback：当向量召回失败时，使用关键字匹配检索菜谱
-    遍历所有菜谱，按关键词命中数排序
-    """
+    """Fallback：当向量召回失败时，使用关键字匹配检索菜谱"""
     try:
         logger.info(f"[RAG] Fallback 关键字匹配 (keywords: {keywords})")
         scored = []
 
         for recipe in RECIPES:
-            # 拼接可搜索文本
             searchable = (
                 recipe["name"] + " " +
                 recipe["cuisine"] + " " +
@@ -183,7 +156,6 @@ def keyword_recall(keywords: List[str], top_k: int = 10) -> List[Dict]:
                 recipe["description"]
             ).lower()
 
-            # 统计关键词命中数
             hit_count = sum(1 for kw in keywords if kw.lower() in searchable)
             if hit_count > 0:
                 scored.append({
@@ -213,16 +185,7 @@ def keyword_recall(keywords: List[str], top_k: int = 10) -> List[Dict]:
 # ========== Stage 3: Rerank 重排 ==========
 
 def rule_based_rerank(query_info: Dict, candidates: List[Dict], top_n: int = 5) -> List[Dict]:
-    """
-    基于规则的重排打分（Fallback 方案，也可作为主方案）
-
-    打分维度：
-    1. 原始 query 关键词在菜名中的命中（权重 3.0）
-    2. 原始 query 关键词在食材中的命中（权重 2.0）
-    3. 改写关键词在标签中的命中（权重 1.5）
-    4. 菜系匹配（权重 1.0）
-    5. 向量召回相似度分数（权重 1.0）
-    """
+    """基于规则的重排打分（Fallback 方案）"""
     original_kw = query_info["original"].lower().split()
     rewritten_kw = [kw.lower() for kw in query_info.get("keywords", [])]
 
@@ -233,7 +196,6 @@ def rule_based_rerank(query_info: Dict, candidates: List[Dict], top_n: int = 5) 
         cuisine = recipe.get("cuisine", "").lower()
         vector_score = recipe.get("score", 0)
 
-        # 各维度打分
         name_hits = sum(1 for kw in original_kw if kw in name)
         ingredient_hits = sum(1 for kw in original_kw if kw in ingredients)
         tag_hits = sum(1 for kw in rewritten_kw if kw in tags)
@@ -253,25 +215,19 @@ def rule_based_rerank(query_info: Dict, candidates: List[Dict], top_n: int = 5) 
 
 
 def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> List[Dict]:
-    """
-    使用 DashScope gte-rerank 模型重排（主方案）
-    失败时自动降级为 rule_based_rerank
-    """
+    """使用 DashScope gte-rerank 模型重排（主方案）"""
     try:
         import dashscope
 
-        api_key = os.getenv("DASHSCOPE_API_KEY", "")
-        if not api_key:
+        if not DASHSCOPE_API_KEY:
             logger.warning("[RAG] 未配置 DASHSCOPE_API_KEY，Rerank 降级为规则打分")
             return rule_based_rerank(
                 {"original": query, "keywords": query.split()},
                 candidates, top_n
             )
 
-        # dashscope SDK 通过环境变量 DASHSCOPE_API_KEY 读取密钥
-        os.environ["DASHSCOPE_API_KEY"] = api_key
+        os.environ["DASHSCOPE_API_KEY"] = DASHSCOPE_API_KEY
 
-        # 构造 documents
         documents = []
         for c in candidates:
             doc_text = f"{c['name']} {c.get('ingredients', '')} {c.get('tags', '')} {c.get('description', '')}"
@@ -284,7 +240,7 @@ def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> List
             documents=documents,
             top_n=top_n,
             return_documents=False,
-            api_key=api_key,
+            api_key=DASHSCOPE_API_KEY,
         )
 
         if resp.status_code != 200:
@@ -294,7 +250,6 @@ def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> List
                 candidates, top_n
             )
 
-        # 按 rerank 分数重排
         reranked = []
         for item in resp.output["results"]:
             idx = item["index"]
@@ -347,7 +302,6 @@ def rag_search(user_query: str, top_k: int = RAG_TOP_K, top_n: int = RAG_TOP_N) 
     candidates = vector_recall(query_info["rewritten"], top_k=top_k)
 
     if not candidates:
-        # Fallback: 关键字匹配
         pipeline_log.append("  ⚠️ 向量召回失败，降级为关键字匹配")
         fallback_used = True
         candidates = keyword_recall(query_info["keywords"], top_k=top_k)

@@ -3,43 +3,36 @@ RAG 向量存储模块
 - 使用 ChromaDB 作为本地向量数据库
 - 使用 DashScope text-embedding-v3 作为 Embedding 模型（通过 OpenAI 兼容接口）
 - 提供 52 条菜谱的向量化存储和语义检索能力
-- 所有模型名称/路径/参数均可通过 .env 环境变量配置
+- 所有模型名称/路径/参数均可通过 settings 配置
 """
 
 import os
 from typing import Optional
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 
 from app.common.logger import logger
+from app.core.config import settings
 from app.rag.recipe_data import RECIPES
 
-# ========== 从环境变量读取配置 ==========
+# ========== 从统一配置读取 ==========
 
-# ChromaDB 持久化存储路径（相对于项目根目录）
-_CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "db/chroma_data")
-CHROMA_DB_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    *_CHROMA_DB_DIR.split("/")
-)
+# ChromaDB 持久化存储路径
+CHROMA_DB_PATH = str(settings.chroma_db_path)
 
 # ChromaDB 集合名称
-COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "recipes")
+COLLECTION_NAME = settings.chroma_collection_name
 
 # Embedding 模型名称
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
+EMBEDDING_MODEL = settings.embedding_model
 
-# Embedding 批量大小（DashScope 限制每次最多 10 条）
-EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "10"))
+# Embedding 批量大小
+EMBEDDING_BATCH_SIZE = settings.embedding_batch_size
 
 # DashScope API 配置
-DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
-DASHSCOPE_BASE_URL = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+DASHSCOPE_API_KEY = settings.dashscope_api_key
+DASHSCOPE_BASE_URL = settings.dashscope_base_url
 
 # 全局单例（懒加载）
 _client: Optional[chromadb.ClientAPI] = None
@@ -48,8 +41,6 @@ _collection: Optional[chromadb.Collection] = None
 
 def _get_embedding_function() -> OpenAIEmbeddingFunction:
     """创建 DashScope Embedding 函数（走 OpenAI 兼容接口）"""
-    # ChromaDB 的 OpenAIEmbeddingFunction 要求 CHROMA_OPENAI_API_KEY 环境变量必须存在
-    # 即使传了 api_key 参数，它仍然会检查这个环境变量
     os.environ["CHROMA_OPENAI_API_KEY"] = DASHSCOPE_API_KEY
 
     logger.info(f"[RAG] Embedding 模型: {EMBEDDING_MODEL} | API: {DASHSCOPE_BASE_URL}")
@@ -74,21 +65,18 @@ def get_collection() -> chromadb.Collection:
         return _collection
 
     try:
-        # 1. 创建持久化客户端
         os.makedirs(CHROMA_DB_PATH, exist_ok=True)
         _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
         logger.info(f"[RAG] ChromaDB 持久化路径: {CHROMA_DB_PATH}")
         logger.info(f"[RAG] 集合名称: {COLLECTION_NAME}")
 
-        # 2. 获取或创建集合（绑定 DashScope Embedding）
         ef = _get_embedding_function()
         _collection = _client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=ef,
-            metadata={"description": "智膳 AI 菜谱知识库 - 52 条常见菜谱"},
+            metadata={"description": f"{settings.app_name} 菜谱知识库 - 52 条常见菜谱"},
         )
 
-        # 3. 如果集合为空，灌入菜谱数据
         if _collection.count() == 0:
             _ingest_recipes(_collection)
         else:
@@ -102,7 +90,7 @@ def get_collection() -> chromadb.Collection:
 
 
 def _ingest_recipes(collection: chromadb.Collection):
-    """将 52 条菜谱灌入 ChromaDB 向量库（分批灌入，每批不超过 EMBEDDING_BATCH_SIZE）"""
+    """将 52 条菜谱灌入 ChromaDB 向量库（分批灌入）"""
     logger.info(f"[RAG] 开始灌入 {len(RECIPES)} 条菜谱到 ChromaDB (模型: {EMBEDDING_MODEL}, 批大小: {EMBEDDING_BATCH_SIZE})...")
 
     documents = []
@@ -110,7 +98,6 @@ def _ingest_recipes(collection: chromadb.Collection):
     ids = []
 
     for recipe in RECIPES:
-        # 构建用于向量化检索的文档内容（菜名 + 食材 + 标签 + 简介 + 菜系）
         doc_text = (
             f"菜名：{recipe['name']}\n"
             f"菜系：{recipe['cuisine']}\n"
@@ -121,7 +108,6 @@ def _ingest_recipes(collection: chromadb.Collection):
         )
         documents.append(doc_text)
 
-        # metadata 存储所有结构化字段（用于 Rerank 和过滤）
         metadatas.append({
             "id": recipe["id"],
             "name": recipe["name"],
@@ -136,7 +122,6 @@ def _ingest_recipes(collection: chromadb.Collection):
         })
         ids.append(recipe["id"])
 
-    # 分批灌入（DashScope Embedding API 限制每次最多 10 条）
     total = len(documents)
     for start in range(0, total, EMBEDDING_BATCH_SIZE):
         end = start + EMBEDDING_BATCH_SIZE

@@ -10,8 +10,9 @@ from datetime import datetime
 from typing import Optional
 
 from app.common.logger import logger
+from app.core.config import settings
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "db", "personal_chief.db")
+DB_PATH = str(settings.db_path)
 
 
 def _get_conn() -> sqlite3.Connection:

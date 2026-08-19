@@ -1,5 +1,5 @@
 import os
-
+import logging
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,21 +9,28 @@ from app.api.v1 import oss
 from app.api.v1 import auth
 from app.api.v1 import favorites
 from app.common.logger import setup_logging
+from app.core.config import settings
+from app.core.handlers import register_exception_handlers
 
 # 初始化日志配置
 setup_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="ZhiShan AI API",
-    description="智膳 AI - 多模态智能烹饪助手",
-    version="0.1.0"
+    title=settings.app_name,
+    description=f"{settings.app_name} API - 多模态智能烹饪助手",
+    version=settings.app_version,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
+# 注册全局异常处理器
+register_exception_handlers(app)
+
 # 1. 配置跨域资源共享 (CORS)
-# 插件开发中，由于请求来自浏览器扩展环境，必须正确配置 CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境建议指定插件的 ID 或具体域名
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,24 +47,38 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
-# 前端 fallback 路由 - 只处理非 API 请求
+# 4.健康检查端点
+@app.get("/health")
+async def health_check():
+    """健康检查：返回服务状态、版本、依赖状态"""
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "version": settings.app_version,
+        "environment": "production" if settings.is_production else "development",
+        "llm_model": settings.llm_model,
+    }
+
+# 5.前端 fallback 路由 - 只处理非 API 请求
 @app.get("/{path:path}", include_in_schema=False)
 async def serve_frontend(path: str):
-    # 排除 API 路径
     if path.startswith("api/"):
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "Not Found"}, status_code=404)
-    # 如果请求的是静态文件，直接返回
     file_path = os.path.join(static_dir, path)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
-    # 否则返回 index.html（SPA fallback）
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"message": "智膳 AI 已上线~", "status": "ok"}
+    return {"message": f"{settings.app_name} 已上线~", "status": "ok"}
+
 
 if __name__ == "__main__":
     import uvicorn
-    # 启动命令：python -m app.main
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8001, reload=True)
+    uvicorn.run(
+        "app.main:app",
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=settings.debug or True,
+    )

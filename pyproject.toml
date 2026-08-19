@@ -25,6 +25,7 @@ dependencies = [
     "streamlit>=1.60.0",
     "tavily-python>=0.7.27",
     "uvicorn>=0.52.0",
+    "pydantic-settings>=2.14.2",
 ]
 
 [[tool.uv.index]]
