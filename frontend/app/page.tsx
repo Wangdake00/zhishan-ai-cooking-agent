@@ -335,10 +335,10 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 flex">
+        <div className="h-screen overflow-hidden bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 flex">
             {/* ============ 左侧弹出式侧边栏 ============ */}
             <aside
-                className={`fixed lg:static inset-y-0 left-0 z-40 w-72 bg-white/90 backdrop-blur-md shadow-xl border-r border-orange-100 flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:-translate-x-full"
+                className={`fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 left-0 z-40 w-72 bg-white/90 backdrop-blur-md shadow-xl border-r border-orange-100 flex-shrink-0 flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:-translate-x-full"
                     }`}
             >
                 {/* 侧边栏头部：Logo + 关闭按钮 */}
@@ -349,9 +349,9 @@ export default function Home() {
                         </div>
                         <div>
                             <h1 className="text-base font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                                AI 私人厨师
+                                智膳 AI
                             </h1>
-                            <p className="text-xs text-gray-400">您的专属烹饪助手</p>
+                            <p className="text-xs text-gray-400">多模态智能烹饪助手</p>
                         </div>
                     </div>
                     <button
@@ -515,7 +515,7 @@ export default function Home() {
                                 <p className="text-sm font-semibold text-gray-800 truncate">{user.username}</p>
                                 <p className="text-xs text-gray-500 flex items-center gap-1">
                                     <Sparkles size={10} className="text-orange-400" />
-                                    AI 私厨会员
+                                    智膳 AI 会员
                                 </p>
                             </div>
                             {/* 退出按钮 */}
@@ -655,8 +655,8 @@ export default function Home() {
                                 <div className="p-5 bg-white rounded-full shadow-lg mb-6 border border-orange-100">
                                     <UtensilsCrossed size={56} className="text-orange-400" />
                                 </div>
-                                <h2 className="text-2xl font-bold text-gray-700 mb-2">欢迎使用 AI 私人厨师</h2>
-                                <p className="text-gray-500 mb-8">上传食材图片，或直接描述你有什么食材，我来帮你！</p>
+                                <h2 className="text-2xl font-bold text-gray-700 mb-2">欢迎使用智膳 AI</h2>
+                                <p className="text-gray-500 mb-8">上传食材图片，或直接描述你有什么食材，我来帮你识别、推荐菜谱、分析营养！</p>
 
                                 {/* 功能卡片 */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">

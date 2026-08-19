@@ -85,7 +85,7 @@ def get_collection() -> chromadb.Collection:
         _collection = _client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=ef,
-            metadata={"description": "AI 私厨菜谱知识库 - 52 条常见菜谱"},
+            metadata={"description": "智膳 AI 菜谱知识库 - 52 条常见菜谱"},
         )
 
         # 3. 如果集合为空，灌入菜谱数据

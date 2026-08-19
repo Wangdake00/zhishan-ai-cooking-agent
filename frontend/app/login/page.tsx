@@ -77,7 +77,7 @@ export default function LoginPage() {
                             <ChefHat className="text-white" size={32} />
                         </div>
                         <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                            AI 私人厨师
+                            智膳 AI
                         </h1>
                         <p className="text-sm text-gray-500 mt-1">
                             {isLogin ? "欢迎回来，请登录" : "创建账号，开启美食之旅"}

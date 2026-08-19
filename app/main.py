@@ -14,8 +14,8 @@ from app.common.logger import setup_logging
 setup_logging()
 
 app = FastAPI(
-    title="Personal Chief API",
-    description="私厨",
+    title="ZhiShan AI API",
+    description="智膳 AI - 多模态智能烹饪助手",
     version="0.1.0"
 )
 
@@ -55,7 +55,7 @@ async def serve_frontend(path: str):
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"message": "你的独家私厨上线了~", "status": "ok"}
+    return {"message": "智膳 AI 已上线~", "status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
