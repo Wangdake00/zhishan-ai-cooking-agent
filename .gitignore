@@ -37,7 +37,7 @@ htmlcov/
 app/db/*.db
 
 # ChromaDB 向量数据库持久化数据
-app/db/chroma_data/
+db/chroma_data/
 
 # ========== 前端构建产物 ==========
 # Next.js 构建缓存与导出
