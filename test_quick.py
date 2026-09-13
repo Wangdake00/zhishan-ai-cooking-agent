@@ -7,7 +7,23 @@
 不需要调用 LLM API，秒级完成。
 """
 
+import asyncio
 import sys
+
+
+def _run(coro):
+    """Windows 上 psycopg async（AsyncPostgresSaver）需要 SelectorEventLoop"""
+    if sys.platform == "win32":
+        return asyncio.run(coro, loop_factory=asyncio.SelectorEventLoop)
+    return asyncio.run(coro)
+
+
+def _reset_singletons():
+    """每次 asyncio.run 都是新事件循环，需重置 graph 单例让连接绑定当前循环"""
+    import app.agents.graph as g
+    g._checkpointer = None
+    g._checkpointer_cm = None
+    g._compiled_graph = None
 
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -77,7 +93,8 @@ def test_state_graph_compile():
     section("2. StateGraph 编译测试")
     from app.agents.graph import get_graph
 
-    g = get_graph()
+    _reset_singletons()
+    g = _run(get_graph())
     check("StateGraph 编译成功", g is not None)
 
     # 获取图信息
@@ -152,15 +169,16 @@ def test_checkpointer():
     section("5. Checkpointer 持久化测试")
     from app.agents.graph import _get_checkpointer
 
-    cp = _get_checkpointer()
-    check("SqliteSaver 初始化", cp is not None)
-    check("类型正确", "SqliteSaver" in type(cp).__name__)
+    _reset_singletons()
+    cp = _run(_get_checkpointer())
+    check("AsyncPostgresSaver 初始化", cp is not None)
+    check("类型正确", "AsyncPostgresSaver" in type(cp).__name__)
 
     # 验证方法存在
-    check("有 get 方法", hasattr(cp, 'get'))
-    check("有 put 方法", hasattr(cp, 'put'))
-    check("有 delete_thread 方法", hasattr(cp, 'delete_thread'))
-    check("有 list 方法", hasattr(cp, 'list'))
+    check("有 aget 方法", hasattr(cp, 'aget'))
+    check("有 aput 方法", hasattr(cp, 'aput'))
+    check("有 adelete_thread 方法", hasattr(cp, 'adelete_thread'))
+    check("有 alist 方法", hasattr(cp, 'alist'))
 
 
 def test_tools_definition():
@@ -201,20 +219,25 @@ def test_session_functions():
     section("8. 会话管理函数测试")
     from app.agents.graph import list_sessions, get_messages, delete_session
 
-    # 空用户查询
-    sessions = list_sessions(user_id=-999)
-    check("查询空会话", isinstance(sessions, list))
+    _reset_singletons()
 
-    # 空线程查询
-    msgs = get_messages("nonexistent_thread_xyz")
-    check("查询空消息", msgs == [])
+    async def _t():
+        # 空用户查询
+        sessions = await list_sessions(user_id=-999)
+        check("查询空会话", isinstance(sessions, list))
 
-    # 删除空会话（不应报错）
-    try:
-        delete_session("nonexistent_thread_xyz", user_id=-999)
-        check("删除空会话不报错", True)
-    except Exception:
-        check("删除空会话不报错", False)
+        # 空线程查询
+        msgs = await get_messages("nonexistent_thread_xyz")
+        check("查询空消息", msgs == [])
+
+        # 删除空会话（不应报错）
+        try:
+            await delete_session("nonexistent_thread_xyz", user_id=-999)
+            check("删除空会话不报错", True)
+        except Exception:
+            check("删除空会话不报错", False)
+
+    _run(_t())
 
 
 def test_delegation():

@@ -96,7 +96,7 @@ def test_stream_chat(token: str):
         },
         headers=headers,
         stream=True,
-        timeout=60,
+        timeout=180,  # 流式链路含多次 LLM/RAG 调用，放宽超时避免慢响应误报
     )
     check("通用对话请求", resp.status_code == 200, f"HTTP {resp.status_code}")
 
@@ -119,7 +119,7 @@ def test_stream_chat(token: str):
         },
         headers=headers,
         stream=True,
-        timeout=60,
+        timeout=180,  # 流式链路含多次 LLM/RAG 调用，放宽超时避免慢响应误报
     )
     check("营养意图请求", resp2.status_code == 200)
 
@@ -144,7 +144,7 @@ def test_stream_chat(token: str):
         },
         headers=headers,
         stream=True,
-        timeout=60,
+        timeout=180,  # 流式链路含多次 LLM/RAG 调用，放宽超时避免慢响应误报
     )
     check("菜谱意图请求", resp3.status_code == 200)
 

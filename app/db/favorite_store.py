@@ -1,97 +1,79 @@
 """
-收藏食谱存储模块
+收藏食谱存储模块（PostgreSQL / SQLAlchemy 2.0 async）
 
 独立维护 favorites 表，用户可以收藏喜欢的食谱，支持查看、删除。
 """
-import os
-import sqlite3
-from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
+
 from app.common.logger import logger
-from app.core.config import settings
-
-DB_PATH = str(settings.db_path)
-
-
-def _get_conn() -> sqlite3.Connection:
-    """获取数据库连接并自动建表"""
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS favorites (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id     INTEGER NOT NULL,
-            title       TEXT NOT NULL,
-            content     TEXT NOT NULL,
-            ingredients TEXT NOT NULL DEFAULT '',
-            created_at  TEXT NOT NULL,
-            updated_at  TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    return conn
+from app.db.database import AsyncSessionLocal
+from app.db.models import Favorite
 
 
-def create_favorite(user_id: int, title: str, content: str, ingredients: str = "") -> int:
-    """
-    新增一条收藏记录，返回收藏ID
-    """
-    now = datetime.now().isoformat(timespec="seconds")
-    conn = _get_conn()
-    try:
-        cursor = conn.execute(
-            "INSERT INTO favorites (user_id, title, content, ingredients, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, title, content, ingredients, now, now),
-        )
-        conn.commit()
-        favorite_id = cursor.lastrowid
-        logger.info(f"create_favorite: id={favorite_id}, user_id={user_id}, title={title}")
-        return favorite_id
-    finally:
-        conn.close()
+def _to_dict(row: Favorite) -> dict:
+    """ORM 对象转 dict，时间序列化为 ISO 字符串（保持 API 契约不变）"""
+    return {
+        "id": row.id,
+        "title": row.title,
+        "content": row.content,
+        "ingredients": row.ingredients,
+        "created_at": row.created_at.isoformat(timespec="seconds"),
+        "updated_at": row.updated_at.isoformat(timespec="seconds"),
+    }
 
 
-def list_favorites(user_id: int) -> list[dict]:
+async def create_favorite(user_id: int, title: str, content: str, ingredients: str = "") -> int:
+    """新增一条收藏记录，返回收藏ID；同用户同标题重复收藏时返回已有记录ID"""
+    async with AsyncSessionLocal() as session:
+        row = Favorite(user_id=user_id, title=title, content=content, ingredients=ingredients)
+        session.add(row)
+        try:
+            await session.commit()
+            logger.info(f"create_favorite: id={row.id}, user_id={user_id}, title={title}")
+            return row.id
+        except IntegrityError:
+            # uq_favorites_user_title 冲突：已收藏过，返回已有记录
+            await session.rollback()
+            existing = await session.scalar(
+                select(Favorite).where(Favorite.user_id == user_id, Favorite.title == title)
+            )
+            if existing:
+                logger.info(f"create_favorite: 重复收藏，返回已有 id={existing.id}, user_id={user_id}, title={title}")
+                return existing.id
+            raise
+
+
+async def list_favorites(user_id: int) -> list[dict]:
     """列出指定用户的所有收藏（按创建时间倒序）"""
-    conn = _get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT id, title, content, ingredients, created_at, updated_at FROM favorites WHERE user_id = ? ORDER BY created_at DESC",
-            (user_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        conn.close()
-
-
-def get_favorite(favorite_id: int, user_id: int) -> Optional[dict]:
-    """获取单条收藏（只能查看自己的）"""
-    conn = _get_conn()
-    try:
-        row = conn.execute(
-            "SELECT id, title, content, ingredients, created_at, updated_at FROM favorites WHERE id = ? AND user_id = ?",
-            (favorite_id, user_id),
-        ).fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
-
-
-def delete_favorite(favorite_id: int, user_id: int) -> bool:
-    """删除收藏（只能删自己的），返回是否删除成功"""
-    conn = _get_conn()
-    try:
-        cursor = conn.execute(
-            "DELETE FROM favorites WHERE id = ? AND user_id = ?",
-            (favorite_id, user_id),
+    async with AsyncSessionLocal() as session:
+        rows = await session.scalars(
+            select(Favorite)
+            .where(Favorite.user_id == user_id)
+            .order_by(Favorite.created_at.desc())
         )
-        conn.commit()
-        deleted = cursor.rowcount > 0
+        return [_to_dict(r) for r in rows]
+
+
+async def get_favorite(favorite_id: int, user_id: int) -> Optional[dict]:
+    """获取单条收藏（只能查看自己的）"""
+    async with AsyncSessionLocal() as session:
+        row = await session.scalar(
+            select(Favorite).where(Favorite.id == favorite_id, Favorite.user_id == user_id)
+        )
+        return _to_dict(row) if row else None
+
+
+async def delete_favorite(favorite_id: int, user_id: int) -> bool:
+    """删除收藏（只能删自己的），返回是否删除成功"""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            delete(Favorite).where(Favorite.id == favorite_id, Favorite.user_id == user_id)
+        )
+        await session.commit()
+        deleted = (result.rowcount or 0) > 0
         if deleted:
             logger.info(f"delete_favorite: id={favorite_id}, user_id={user_id}")
         return deleted
-    finally:
-        conn.close()

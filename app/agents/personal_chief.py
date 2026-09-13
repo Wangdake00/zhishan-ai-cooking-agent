@@ -28,6 +28,6 @@ async def search_recipes(prompt: str, image_urls: list, thread_id: str, user_id:
         yield chunk
 
 
-def clear_messages(thread_id: str, user_id: int):
+async def clear_messages(thread_id: str, user_id: int):
     """清空会话（已废弃，请使用 delete_session）"""
-    delete_session(thread_id, user_id)
+    await delete_session(thread_id, user_id)

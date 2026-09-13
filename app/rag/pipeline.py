@@ -214,8 +214,12 @@ def rule_based_rerank(query_info: Dict, candidates: List[Dict], top_n: int = 5) 
     return candidates[:top_n]
 
 
-def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> List[Dict]:
-    """使用 DashScope gte-rerank 模型重排（主方案）"""
+def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> tuple[List[Dict], bool]:
+    """使用 DashScope gte-rerank 模型重排（主方案）
+
+    Returns:
+        (重排结果, 是否降级为规则打分)
+    """
     try:
         import dashscope
 
@@ -224,14 +228,14 @@ def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> List
             return rule_based_rerank(
                 {"original": query, "keywords": query.split()},
                 candidates, top_n
-            )
+            ), True
 
         os.environ["DASHSCOPE_API_KEY"] = DASHSCOPE_API_KEY
 
         documents = []
         for c in candidates:
             doc_text = f"{c['name']} {c.get('ingredients', '')} {c.get('tags', '')} {c.get('description', '')}"
-            documents.append({"content": doc_text})
+            documents.append(doc_text)
 
         logger.info(f"[RAG] Rerank 模型: {RERANK_MODEL}")
         resp = dashscope.TextReRank.call(
@@ -248,7 +252,7 @@ def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> List
             return rule_based_rerank(
                 {"original": query, "keywords": query.split()},
                 candidates, top_n
-            )
+            ), True
 
         reranked = []
         for item in resp.output["results"]:
@@ -259,14 +263,14 @@ def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> List
             reranked.append(recipe)
 
         logger.info(f"[RAG] DashScope Rerank 重排完成，返回 {len(reranked)} 条")
-        return reranked
+        return reranked, False
 
     except Exception as e:
         logger.warning(f"[RAG] DashScope Rerank 失败，降级规则打分: {e}")
         return rule_based_rerank(
             {"original": query, "keywords": query.split()},
             candidates, top_n
-        )
+        ), True
 
 
 # ========== 完整 RAG Pipeline ==========
@@ -320,7 +324,10 @@ def rag_search(user_query: str, top_k: int = RAG_TOP_K, top_n: int = RAG_TOP_N) 
     # ===== Stage 3: Rerank 重排 =====
     pipeline_log.append(f"Stage 3: Rerank 重排 (top_n={top_n})...")
     try:
-        reranked = dashscope_rerank(user_query, candidates, top_n=top_n)
+        reranked, rerank_fellback = dashscope_rerank(user_query, candidates, top_n=top_n)
+        if rerank_fellback:
+            pipeline_log.append("  ⚠️ Rerank 不可用，降级为规则打分")
+            fallback_used = True
         pipeline_log.append(f"  → 重排完成，返回 {len(reranked)} 条")
     except Exception as e:
         pipeline_log.append(f"  ⚠️ Rerank 失败，降级规则打分: {e}")

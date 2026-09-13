@@ -2,7 +2,7 @@
 RAG 向量存储模块
 - 使用 ChromaDB 作为本地向量数据库
 - 使用 DashScope text-embedding-v3 作为 Embedding 模型（通过 OpenAI 兼容接口）
-- 提供 52 条菜谱的向量化存储和语义检索能力
+- 提供 100 条菜谱的向量化存储和语义检索能力
 - 所有模型名称/路径/参数均可通过 settings 配置
 """
 
@@ -57,7 +57,7 @@ def get_collection() -> chromadb.Collection:
     首次调用时：
     1. 创建持久化 ChromaDB 客户端
     2. 获取或创建 recipes 集合（绑定 DashScope Embedding）
-    3. 如果集合为空，自动灌入 52 条菜谱数据
+    3. 如果集合为空，自动灌入全部菜谱数据（RECIPES，当前 100 条）
     """
     global _client, _collection
 
@@ -71,10 +71,15 @@ def get_collection() -> chromadb.Collection:
         logger.info(f"[RAG] 集合名称: {COLLECTION_NAME}")
 
         ef = _get_embedding_function()
+        # 显式指定 cosine 距离空间（ChromaDB 默认为 l2），
+        # 使 vector_recall 中 similarity = 1 - distance/2 的换算语义正确
         _collection = _client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=ef,
-            metadata={"description": f"{settings.app_name} 菜谱知识库 - 52 条常见菜谱"},
+            metadata={
+                "hnsw:space": "cosine",
+                "description": f"{settings.app_name} 菜谱知识库 - 100 道经典菜谱",
+            },
         )
 
         if _collection.count() == 0:
@@ -90,7 +95,7 @@ def get_collection() -> chromadb.Collection:
 
 
 def _ingest_recipes(collection: chromadb.Collection):
-    """将 52 条菜谱灌入 ChromaDB 向量库（分批灌入）"""
+    """将全部菜谱（RECIPES）灌入 ChromaDB 向量库（分批灌入）"""
     logger.info(f"[RAG] 开始灌入 {len(RECIPES)} 条菜谱到 ChromaDB (模型: {EMBEDDING_MODEL}, 批大小: {EMBEDDING_BATCH_SIZE})...")
 
     documents = []
@@ -139,14 +144,18 @@ def _ingest_recipes(collection: chromadb.Collection):
 
 
 def reset_collection():
-    """重置向量库（删除并重建，用于调试）"""
+    """重置向量库（删除并重建，用于调试）
+
+    注意：需先创建客户端再删集合，否则在未初始化过的新进程里会跳过删除，
+    导致 get_or_create 返回旧集合并"跳过灌入"。
+    """
     global _client, _collection
-    if _client is not None:
-        try:
-            _client.delete_collection(COLLECTION_NAME)
-            logger.info("[RAG] 已删除旧集合")
-        except Exception:
-            pass
+    try:
+        client = _client or chromadb.PersistentClient(path=CHROMA_DB_PATH)
+        client.delete_collection(COLLECTION_NAME)
+        logger.info("[RAG] 已删除旧集合")
+    except Exception:
+        pass
     _collection = None
     _client = None
     return get_collection()

@@ -5,18 +5,20 @@
 - 显式 StateGraph 替代隐式 create_agent，意图路由、工具编排可观测
 - 三路子图：NutritionFlow / RecipeFlow / GeneralFlow
 - 统一 AgentState 管理对话、意图、工具结果等结构化数据
-- 保留 SqliteSaver 持久化能力，支持多轮对话恢复
+- 保留 AsyncPostgresSaver 持久化能力，支持多轮对话恢复
 
 图结构：
   Start → detect_intent → [条件边] → nutrition_node / recipe_node / general_node → End
 """
 
 from typing import TypedDict, Optional, Literal, Annotated
+import asyncio
 import operator
 import json
+import sys
 
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import (
     HumanMessage, AIMessage, AIMessageChunk, SystemMessage, ToolMessage
@@ -156,13 +158,13 @@ def calculate_nutrition(ingredients: str, servings: Optional[int] = 1) -> str:
     output = []
     output.append(f"## 营养成分分析报告（{servings}人份）\n")
     output.append("### 各食材营养明细：\n")
-    output.append("| 食材 | 重量 | 卡路里 | 蛋白质(g) | 脂肪(g) | 碳水(g) | 纤维(g) |")
-    output.append("|------|------|--------|-----------|---------|---------|---------|")
+    output.append("| 食材 | 重量(g) | 卡路里(kcal) | 蛋白质(g) | 脂肪(g) | 碳水(g) | 纤维(g) |")
+    output.append("|------|---------|--------------|-----------|---------|---------|---------|")
     for r in results:
         if "note" in r:
-            output.append(f"| {r['name']} | {r['weight']}g | - | - | - | - | - | *{r['note']}* |")
+            output.append(f"| {r['name']} | {r['weight']} | - | - | - | - | - | *{r['note']}* |")
         else:
-            output.append(f"| {r['name']} | {r['weight']}g | {r['calories']} | {r['protein']} | {r['fat']} | {r['carbs']} | {r['fiber']} |")
+            output.append(f"| {r['name']} | {r['weight']} | {r['calories']} | {r['protein']} | {r['fat']} | {r['carbs']} | {r['fiber']} |")
 
     output.append("\n### 营养汇总：\n")
     output.append(f"- **总卡路里**：{round(total['calories'], 1)} kcal")
@@ -408,7 +410,7 @@ def search_recipes_rag(query: str, top_n: Optional[int] = 5) -> str:
 def make_save_favorite_tool(user_id: int):
     """为当前用户创建一个绑定了 user_id 的收藏工具"""
     @tool
-    def save_favorite_recipe(recipe_title: str, recipe_content: str, ingredients: Optional[str] = None) -> str:
+    async def save_favorite_recipe(recipe_title: str, recipe_content: str, ingredients: Optional[str] = None) -> str:
         """
         收藏一个食谱到用户的个人收藏夹。
 
@@ -422,7 +424,7 @@ def make_save_favorite_tool(user_id: int):
         """
         logger.info(f"[工具调用] save_favorite_recipe: title={recipe_title}, user_id={user_id}")
         try:
-            favorite_id = favorite_store.create_favorite(
+            favorite_id = await favorite_store.create_favorite(
                 user_id=user_id,
                 title=recipe_title,
                 content=recipe_content,
@@ -473,7 +475,7 @@ SYSTEM_PROMPTS = {
     "recipe": """你是一名智能烹饪助手，专注于根据食材推荐菜谱。请按以下流程：
 
 1. 识别食材：若有照片，识别所有可见食材
-2. RAG 检索：优先调用 search_recipes_rag 检索本地 52 道经典菜谱
+2. RAG 检索：优先调用 search_recipes_rag 检索本地 100 道经典菜谱
 3. 补充搜索：RAG 结果不足时，再用 web_search
 4. 排序推荐：从「食材匹配度 + 难度 + 营养」三维评分排序
 
@@ -499,11 +501,11 @@ SYSTEM_PROMPTS = {
 def detect_intent(state: AgentState) -> dict:
     """意图检测节点：根据用户消息判断意图"""
     messages = state.get("messages", [])
-    logger.info(f"[detect_intent] 输入 messages 数量: {len(messages)}")
+    logger.debug(f"[detect_intent] 输入 messages 数量: {len(messages)}")
     for i, m in enumerate(messages):
         role = "👤" if isinstance(m, HumanMessage) else ("🤖" if isinstance(m, AIMessage) else ("🔧" if isinstance(m, ToolMessage) else "❓"))
         content_preview = (m.content[:80] if isinstance(m.content, str) else str(m.content)[:80]) if hasattr(m, 'content') else str(m)[:80]
-        logger.info(f"[detect_intent]   msg[{i}] {role} {type(m).__name__}: {content_preview}")
+        logger.debug(f"[detect_intent]   msg[{i}] {role} {type(m).__name__}: {content_preview}")
 
     if not messages:
         logger.info(f"[detect_intent] 无消息 → 兜底 general")
@@ -538,9 +540,15 @@ def detect_intent(state: AgentState) -> dict:
 
 # ========== Agent 执行核心（带工具循环） ==========
 
-def _run_agent_with_tools(messages: list, tools: list, max_iterations: int = 5) -> list:
+async def _run_agent_with_tools(messages: list, tools: list, max_iterations: int = 5) -> list:
     """
-    执行带工具调用的 Agent 循环
+    执行带工具调用的 Agent 循环（异步）
+
+    说明：
+    - LLM 调用使用 ainvoke，不阻塞事件循环
+    - 工具统一通过 ainvoke 调用：async 工具（如收藏）原生执行，
+      同步工具（RAG/Tavily/计算类）自动转入线程池执行，避免冻结事件循环
+      —— 这是修复"async-only 收藏工具在同步循环中必失败"的关键
 
     Args:
         messages: 初始消息列表
@@ -554,17 +562,17 @@ def _run_agent_with_tools(messages: list, tools: list, max_iterations: int = 5) 
     current_messages = list(messages)
     model_with_tools = _model.bind_tools(tools)
 
-    logger.info(f"[_run_agent_with_tools] 输入消息数: {len(messages)}, 工具数: {len([t.name for t in tools])}")
+    logger.debug(f"[_run_agent_with_tools] 输入消息数: {len(messages)}, 工具数: {len([t.name for t in tools])}")
 
     for iteration in range(max_iterations):
-        logger.info(f"[_run_agent_with_tools] 迭代 {iteration+1}/{max_iterations}: 调用 LLM...")
-        response = model_with_tools.invoke(current_messages)
+        logger.debug(f"[_run_agent_with_tools] 迭代 {iteration+1}/{max_iterations}: 调用 LLM...")
+        response = await model_with_tools.ainvoke(current_messages)
         current_messages.append(response)
 
         tool_calls_count = len(response.tool_calls) if (hasattr(response, "tool_calls") and response.tool_calls) else 0
-        logger.info(f"[_run_agent_with_tools]   LLM 返回 AIMessage, tool_calls 数: {tool_calls_count}")
+        logger.debug(f"[_run_agent_with_tools]   LLM 返回 AIMessage, tool_calls 数: {tool_calls_count}")
         if hasattr(response, "content") and isinstance(response.content, str) and response.content:
-            logger.info(f"[_run_agent_with_tools]   LLM 文本回复预览: {response.content[:120]}")
+            logger.debug(f"[_run_agent_with_tools]   LLM 文本回复预览: {response.content[:120]}")
 
         if not hasattr(response, "tool_calls") or not response.tool_calls:
             logger.info(f"[_run_agent_with_tools] 无工具调用，结束循环。当前总消息数: {len(current_messages)}")
@@ -574,13 +582,13 @@ def _run_agent_with_tools(messages: list, tools: list, max_iterations: int = 5) 
             tool_name = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
             tool_args = tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})
             call_id = tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", "")
-            logger.info(f"[_run_agent_with_tools]   🔧 调用工具: {tool_name}, 参数: {json.dumps(tool_args, ensure_ascii=False)[:100]}")
+            logger.debug(f"[_run_agent_with_tools]   🔧 调用工具: {tool_name}, 参数: {json.dumps(tool_args, ensure_ascii=False)[:100]}")
 
             if tool_name in tool_map:
                 try:
-                    tool_result = tool_map[tool_name].invoke(tool_args)
+                    tool_result = await tool_map[tool_name].ainvoke(tool_args)
                     result_preview = str(tool_result)[:150].replace("\n", " ")
-                    logger.info(f"[_run_agent_with_tools]   ✅ {tool_name} 执行成功，结果预览: {result_preview}")
+                    logger.debug(f"[_run_agent_with_tools]   ✅ {tool_name} 执行成功，结果预览: {result_preview}")
                 except Exception as e:
                     logger.error(f"[_run_agent_with_tools]   ❌ {tool_name} 执行失败: {e}")
                     tool_result = f"❌ 工具执行失败：{str(e)}"
@@ -628,7 +636,7 @@ def _format_messages_debug(messages: list) -> str:
 
 # ========== 子图节点 ==========
 
-def nutrition_node(state: AgentState) -> dict:
+async def nutrition_node(state: AgentState) -> dict:
     """营养分析子图"""
     user_id = state.get("user_id", 0)
     user_save_tool = make_save_favorite_tool(user_id)
@@ -636,27 +644,27 @@ def nutrition_node(state: AgentState) -> dict:
 
     system = SystemMessage(content=SYSTEM_PROMPTS["nutrition"])
     state_messages = state.get("messages", [])
-    logger.info(f"[nutrition_node] 进入节点，state.messages 数量: {len(state_messages)}")
-    logger.info(f"[nutrition_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
+    logger.debug(f"[nutrition_node] 进入节点，state.messages 数量: {len(state_messages)}")
+    logger.debug(f"[nutrition_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
     messages = [system] + state_messages
-    logger.info(f"[nutrition_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
+    logger.debug(f"[nutrition_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
-        result_messages = _run_agent_with_tools(messages, tools)
+        result_messages = await _run_agent_with_tools(messages, tools)
         new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
-        logger.info(f"[nutrition_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
-        logger.info(f"[nutrition_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
-        logger.info(f"[nutrition_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
+        logger.debug(f"[nutrition_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
+        logger.debug(f"[nutrition_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
+        logger.debug(f"[nutrition_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
         return {"messages": new_ai_messages}
     except Exception as e:
         logger.error(f"[nutrition_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 营养分析处理失败：{str(e)}")
-        logger.info(f"[nutrition_node] 返回错误 AI 消息 (将追加): {_format_messages_debug([error_msg])}")
+        logger.warning(f"[nutrition_node] 返回错误 AI 消息 (将追加): {_format_messages_debug([error_msg])}")
         return {"messages": [error_msg]}
 
 
-def recipe_node(state: AgentState) -> dict:
+async def recipe_node(state: AgentState) -> dict:
     """菜谱推荐子图"""
     user_id = state.get("user_id", 0)
     user_save_tool = make_save_favorite_tool(user_id)
@@ -664,27 +672,27 @@ def recipe_node(state: AgentState) -> dict:
 
     system = SystemMessage(content=SYSTEM_PROMPTS["recipe"])
     state_messages = state.get("messages", [])
-    logger.info(f"[recipe_node] 进入节点，state.messages 数量: {len(state_messages)}")
-    logger.info(f"[recipe_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
+    logger.debug(f"[recipe_node] 进入节点，state.messages 数量: {len(state_messages)}")
+    logger.debug(f"[recipe_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
     messages = [system] + state_messages
-    logger.info(f"[recipe_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
+    logger.debug(f"[recipe_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
-        result_messages = _run_agent_with_tools(messages, tools)
+        result_messages = await _run_agent_with_tools(messages, tools)
         new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
-        logger.info(f"[recipe_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
-        logger.info(f"[recipe_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
-        logger.info(f"[recipe_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
+        logger.debug(f"[recipe_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
+        logger.debug(f"[recipe_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
+        logger.debug(f"[recipe_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
         return {"messages": new_ai_messages}
     except Exception as e:
         logger.error(f"[recipe_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 菜谱推荐处理失败：{str(e)}")
-        logger.info(f"[recipe_node] 返回错误 AI 消息 (将追加): {_format_messages_debug([error_msg])}")
+        logger.warning(f"[recipe_node] 返回错误 AI 消息 (将追加): {_format_messages_debug([error_msg])}")
         return {"messages": [error_msg]}
 
 
-def general_node(state: AgentState) -> dict:
+async def general_node(state: AgentState) -> dict:
     """通用对话子图"""
     user_id = state.get("user_id", 0)
     user_save_tool = make_save_favorite_tool(user_id)
@@ -692,23 +700,23 @@ def general_node(state: AgentState) -> dict:
 
     system = SystemMessage(content=SYSTEM_PROMPTS["general"])
     state_messages = state.get("messages", [])
-    logger.info(f"[general_node] 进入节点，state.messages 数量: {len(state_messages)}")
-    logger.info(f"[general_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
+    logger.debug(f"[general_node] 进入节点，state.messages 数量: {len(state_messages)}")
+    logger.debug(f"[general_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
     messages = [system] + state_messages
-    logger.info(f"[general_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
+    logger.debug(f"[general_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
-        result_messages = _run_agent_with_tools(messages, tools)
+        result_messages = await _run_agent_with_tools(messages, tools)
         new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
-        logger.info(f"[general_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
-        logger.info(f"[general_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
-        logger.info(f"[general_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
+        logger.debug(f"[general_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
+        logger.debug(f"[general_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
+        logger.debug(f"[general_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
         return {"messages": new_ai_messages}
     except Exception as e:
         logger.error(f"[general_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 对话处理失败：{str(e)}")
-        logger.info(f"[general_node] 返回错误 AI 消息 (将追加): {_format_messages_debug([error_msg])}")
+        logger.warning(f"[general_node] 返回错误 AI 消息 (将追加): {_format_messages_debug([error_msg])}")
         return {"messages": [error_msg]}
 
 
@@ -744,27 +752,36 @@ def _build_graph() -> StateGraph:
 
 # ========== 单例管理 ==========
 
-_checkpointer = None
+_checkpointer: Optional[AsyncPostgresSaver] = None
 _checkpointer_cm = None
 _compiled_graph = None
 
 
-def _get_checkpointer() -> SqliteSaver:
+async def _get_checkpointer() -> AsyncPostgresSaver:
+    """单例获取 AsyncPostgresSaver（首次调用时建连并初始化 checkpoint 表）"""
     global _checkpointer, _checkpointer_cm
     if _checkpointer is None:
-        db_path = str(settings.db_path)
-        _checkpointer_cm = SqliteSaver.from_conn_string(db_path)
-        _checkpointer = _checkpointer_cm.__enter__()
-        logger.info(f"[Checkpointer] 初始化完成: {db_path}")
+        # Windows 下 ProactorEventLoop 与 psycopg async 不兼容（add_reader 不支持），
+        # 在这里明确报错，避免后期出现难以排查的连接异常
+        if sys.platform == "win32" and type(asyncio.get_running_loop()).__name__ == "ProactorEventLoop":
+            raise RuntimeError(
+                "检测到 ProactorEventLoop，与 psycopg async 不兼容。"
+                "请使用 python -m app.main 启动，或在启动前设置 "
+                "asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())"
+            )
+        _checkpointer_cm = AsyncPostgresSaver.from_conn_string(settings.postgres_dsn)
+        _checkpointer = await _checkpointer_cm.__aenter__()
+        await _checkpointer.setup()  # 自动创建 checkpoint 相关表（幂等）
+        logger.info(f"[Checkpointer] AsyncPostgresSaver 初始化完成: db={settings.postgres_db}")
     return _checkpointer
 
 
-def get_graph():
+async def get_graph():
     """获取编译后的 StateGraph（单例）"""
     global _compiled_graph
     if _compiled_graph is None:
         graph = _build_graph()
-        _compiled_graph = graph.compile(checkpointer=_get_checkpointer())
+        _compiled_graph = graph.compile(checkpointer=await _get_checkpointer())
         logger.info("[StateGraph] 编译完成")
     return _compiled_graph
 
@@ -785,10 +802,10 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
     logger.info(f"[stream_chat] 新请求: prompt='{prompt[:80]}', images={len(image_urls or [])}张, thread_id={thread_id}, user_id={user_id}")
     logger.info(f"[stream_chat] ========================================")
 
-    session_store.upsert_session(thread_id, user_id=user_id, title=(prompt or "上传了图片")[:30])
+    await session_store.upsert_session(thread_id, user_id=user_id, title=(prompt or "上传了图片")[:30])
 
     try:
-        graph = get_graph()
+        graph = await get_graph()
 
         content_blocks = []
         if image_urls:
@@ -817,25 +834,25 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
             content_blocks.append({"type": "text", "text": prompt})
 
         message = HumanMessage(content=content_blocks)
-        logger.info(f"[stream_chat] 构造本轮 HumanMessage: {_format_messages_debug([message])}")
+        logger.debug(f"[stream_chat] 构造本轮 HumanMessage: {_format_messages_debug([message])}")
 
         # debug: 调用前查看 checkpoint 中已有多少消息
-        cp = _get_checkpointer()
+        cp = await _get_checkpointer()
         try:
-            existing_checkpoint = cp.get({"configurable": {"thread_id": thread_id}})
+            existing_checkpoint = await cp.aget({"configurable": {"thread_id": thread_id}})
             if existing_checkpoint and existing_checkpoint.get("channel_values"):
                 existing_msgs = existing_checkpoint["channel_values"].get("messages", [])
-                logger.info(f"[stream_chat] 📌 Checkpoint 加载的历史消息数: {len(existing_msgs)}")
+                logger.debug(f"[stream_chat] 📌 Checkpoint 加载的历史消息数: {len(existing_msgs)}")
                 if existing_msgs:
-                    logger.info(f"[stream_chat] Checkpoint 历史详情:\n{_format_messages_debug(existing_msgs)}")
-                logger.info(f"[stream_chat] 📌 reducer 合并后首轮 state.messages = {len(existing_msgs)} (历史) + 1 (本轮 Human) = {len(existing_msgs) + 1} 条")
+                    logger.debug(f"[stream_chat] Checkpoint 历史详情:\n{_format_messages_debug(existing_msgs)}")
+                logger.debug(f"[stream_chat] 📌 reducer 合并后首轮 state.messages = {len(existing_msgs)} (历史) + 1 (本轮 Human) = {len(existing_msgs) + 1} 条")
             else:
-                logger.info(f"[stream_chat] 📌 无 checkpoint 历史（新会话），首轮 state.messages = 1 条 HumanMessage")
+                logger.debug(f"[stream_chat] 📌 无 checkpoint 历史（新会话），首轮 state.messages = 1 条 HumanMessage")
         except Exception as e:
             logger.warning(f"[stream_chat] 读取 checkpoint 失败: {e}")
 
         total_chunks = 0
-        for event in graph.stream(
+        async for event in graph.astream(
             {
                 "messages": [message],
                 "user_id": user_id,
@@ -857,12 +874,12 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
 
         # debug: 调用后查看 checkpoint 中保存的消息
         try:
-            after_checkpoint = cp.get({"configurable": {"thread_id": thread_id}})
+            after_checkpoint = await cp.aget({"configurable": {"thread_id": thread_id}})
             if after_checkpoint and after_checkpoint.get("channel_values"):
                 after_msgs = after_checkpoint["channel_values"].get("messages", [])
-                logger.info(f"[stream_chat] 执行后 Checkpoint 保存的消息数: {len(after_msgs)}")
+                logger.debug(f"[stream_chat] 执行后 Checkpoint 保存的消息数: {len(after_msgs)}")
                 if after_msgs:
-                    logger.info(f"[stream_chat] 执行后消息详情:\n{_format_messages_debug(after_msgs)}")
+                    logger.debug(f"[stream_chat] 执行后消息详情:\n{_format_messages_debug(after_msgs)}")
         except Exception as e:
             logger.warning(f"[stream_chat] 执行后读取 checkpoint 失败: {e}")
 
@@ -880,27 +897,27 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
 
 # ========== 会话管理 ==========
 
-def list_sessions(user_id: int) -> list:
+async def list_sessions(user_id: int) -> list:
     """列出指定用户的所有会话"""
-    return session_store.list_sessions(user_id)
+    return await session_store.list_sessions(user_id)
 
 
-def delete_session(thread_id: str, user_id: int):
+async def delete_session(thread_id: str, user_id: int):
     """删除会话"""
     logger.info(f"删除会话，thread_id: {thread_id}, user_id: {user_id}")
     try:
-        cp = _get_checkpointer()
-        cp.delete_thread(thread_id)
+        cp = await _get_checkpointer()
+        await cp.adelete_thread(thread_id)
     except Exception as e:
         logger.error(f"删除 checkpointer 记录失败: {e}")
-    session_store.delete_session(thread_id, user_id)
+    await session_store.delete_session(thread_id, user_id)
 
 
-def get_messages(thread_id: str) -> list:
+async def get_messages(thread_id: str) -> list:
     """获取会话历史消息"""
     logger.info(f"获取历史消息，thread_id: {thread_id}")
-    cp = _get_checkpointer()
-    checkpoint = cp.get({"configurable": {"thread_id": thread_id}})
+    cp = await _get_checkpointer()
+    checkpoint = await cp.aget({"configurable": {"thread_id": thread_id}})
 
     if not checkpoint:
         return []

@@ -1,72 +1,47 @@
 """
-用户数据存储
+用户数据存储（PostgreSQL / SQLAlchemy 2.0 async）
 """
-import os
-import sqlite3
-from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import select
+
 from app.common.logger import logger
-from app.core.config import settings
-
-DB_PATH = str(settings.db_path)
-
-
-def _get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            username        TEXT UNIQUE NOT NULL,
-            password_hash   TEXT NOT NULL,
-            created_at      TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    return conn
+from app.db.database import AsyncSessionLocal
+from app.db.models import User
 
 
-def create_user(username: str, password_hash: str) -> dict:
+def _to_dict(user: User, with_password: bool = False) -> dict:
+    """ORM 对象转 dict，时间序列化为 ISO 字符串（保持 API 契约不变）"""
+    data = {
+        "id": user.id,
+        "username": user.username,
+        "created_at": user.created_at.isoformat(timespec="seconds"),
+    }
+    if with_password:
+        data["password_hash"] = user.password_hash
+    return data
+
+
+async def create_user(username: str, password_hash: str) -> dict:
     """新建用户，返回用户字典"""
-    now = datetime.now().isoformat(timespec="seconds")
-    conn = _get_conn()
-    try:
-        conn.execute(
-            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-            (username, password_hash, now),
-        )
-        conn.commit()
-        user = get_user_by_username(username)
-        logger.info(f"create_user: username={username}, id={user['id']}")
-        return user
-    finally:
-        conn.close()
+    async with AsyncSessionLocal() as session:
+        user = User(username=username, password_hash=password_hash)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        logger.info(f"create_user: username={username}, id={user.id}")
+        return _to_dict(user, with_password=True)
 
 
-def get_user_by_username(username: str) -> Optional[dict]:
+async def get_user_by_username(username: str) -> Optional[dict]:
     """按用户名查询用户"""
-    conn = _get_conn()
-    try:
-        row = conn.execute(
-            "SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
+    async with AsyncSessionLocal() as session:
+        user = await session.scalar(select(User).where(User.username == username))
+        return _to_dict(user, with_password=True) if user else None
 
 
-def get_user_by_id(user_id: int) -> Optional[dict]:
+async def get_user_by_id(user_id: int) -> Optional[dict]:
     """按 ID 查询用户"""
-    conn = _get_conn()
-    try:
-        row = conn.execute(
-            "SELECT id, username, created_at FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
+    async with AsyncSessionLocal() as session:
+        user = await session.get(User, user_id)
+        return _to_dict(user) if user else None

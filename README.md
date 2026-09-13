@@ -16,7 +16,7 @@
 
 ## 数据边界 / 免责声明
 
-> - 菜谱知识库内置 **52 道**常见家常菜，覆盖川、粤、鲁、苏等菜系，用于演示 RAG 检索链路；生产环境需扩充至更大规模知识库。
+> - 菜谱知识库内置 **100 道**常见家常菜，覆盖川、粤、鲁、苏、湘、东北等菜系，用于演示 RAG 检索链路；生产环境需扩充至更大规模知识库。
 - 营养计算基于常见食材每 100g 营养成分表估算，**仅供参考，不构成医学或膳食建议**，特殊饮食需求请咨询专业营养师。
 - 联网搜索结果来自 Tavily，内容质量依赖第三方数据源。
 
@@ -34,7 +34,7 @@
 
 ![识图热量计算.png](./views/识图热量计算.png)
 
-**菜谱 + re'l**：在推荐菜谱的同时计算该菜品的营养成分，一站式获取做法与热量信息。
+**菜谱+热量计算**：在推荐菜谱的同时计算该菜品的营养成分，一站式获取做法与热量信息。
 
 ![菜谱+热量计算.png](./views/菜谱+热量计算.png)
 
@@ -52,7 +52,7 @@
 
 - **三路显式 Agent Workflow**：基于 LangGraph StateGraph 构建营养分析 / 菜谱推荐 / 通用对话三个专家节点，关键词意图路由动态切换 System Prompt 与工具集，LLM 在节点内自主决定工具调用顺序与次数（最多 5 轮循环）
 - **闭包级用户身份绑定（防越权）**：收藏工具通过闭包在请求进入时锁定真实 `user_id`，工具 schema 完全不暴露该参数，从根源杜绝 LLM 幻觉导致的跨用户收藏
-- **Reducer + SQLite Checkpoint 多轮持久化**：`Annotated[list, operator.add]` 实现消息追加不覆盖，`SqliteSaver` 按 `thread_id` 持久化整个状态快照，新请求自动恢复上下文
+- **Reducer + PostgreSQL Checkpoint 多轮持久化**：`Annotated[list, operator.add]` 实现消息追加不覆盖，`AsyncPostgresSaver` 按 `thread_id` 持久化整个状态快照，新请求自动恢复上下文
 - **三阶段 RAG 检索 + 全链路降级**：Query Rewrite（失败回退原 query）→ ChromaDB 向量召回 Top10（失败降级关键字匹配）→ gte-rerank 精排 Top5（失败降级规则加权打分），知识库未命中时自动切换 Tavily 联网搜索兜底
 - **多模态输入与工具参数双层防幻觉**：支持多图 + 文本同条消息输入，System Prompt 注入用量常识约束（肉类 80~180g、叶菜 80~200g 等 40+ 品类区间），工具函数内部再 clamp 一层
 - **OSS 预签名直传 + SSE 流式输出**：前端直接 PUT 到阿里云 OSS，后端零转发；FastAPI `StreamingResponse` 逐 token 推送给前端
@@ -66,7 +66,7 @@
 | 后端 | Python 3.13+、FastAPI、Pydantic v2 |
 | AI 框架 | LangGraph、LangChain、langchain-tavily |
 | 向量检索 | ChromaDB、DashScope text-embedding-v3、gte-rerank |
-| 数据库 | SQLite（用户 / 会话 / 收藏 / Checkpoint） |
+| 数据库 | PostgreSQL 17 + SQLAlchemy 2.0 async + Alembic（用户 / 会话 / 收藏 / Checkpoint） |
 | 大模型 | 通义千问 qwen3.5-plus（多模态） |
 | 外部服务 | 阿里云 OSS、Tavily Search |
 | 认证 | JWT + bcrypt |
@@ -83,7 +83,7 @@
 | Agent 编排层 | `app/agents/graph.py` | StateGraph 构建、意图路由、子节点执行、Checkpoint 持久化 |
 | RAG 检索层 | `app/rag/pipeline.py`、`app/rag/vector_store.py` | Query 改写、向量召回、Rerank 重排、全链路降级 |
 | 工具层 | `app/agents/graph.py`（`@tool` 装饰器） | RAG 检索、营养计算、购物清单、联网搜索、用户级收藏 |
-| 数据层 | `app/db/` | 用户、会话、收藏三类 SQLite 存储 |
+| 数据层 | `app/db/` | SQLAlchemy ORM 模型 + 用户、会话、收藏三类异步存储 |
 | 前端 | `frontend/` | Next.js 对话界面、SSE 流式渲染、OSS 直传 |
 
 ### 系统数据流
@@ -114,8 +114,8 @@ flowchart TB
         D -->|RAG 检索| CH[(ChromaDB 菜谱向量库)]:::data
         D -->|营养计算| NUT[内置营养成分表]:::data
         D -->|联网搜索| TV[Tavily Search]:::external
-        D -->|收藏| FAV[(SQLite 收藏表)]:::data
-        D -->|会话持久化| CP[(SQLite Checkpoint)]:::data
+        D -->|收藏| FAV[(PostgreSQL 收藏表)]:::data
+        D -->|会话持久化| CP[(PostgreSQL Checkpoint)]:::data
     end
 ```
 
@@ -123,11 +123,11 @@ flowchart TB
 
 | 存储 | 实现位置 | 职责 | 设计原因 |
 |---|---|---|---|
-| SQLite - 用户表 | `app/db/user_store.py` | 用户名 / 密码哈希 / 注册时间 | 轻量、零依赖、适合个人项目 |
-| SQLite - 会话表 | `app/db/session_store.py` | thread_id 与 user_id 映射、会话标题 | 会话列表展示与权限隔离 |
-| SQLite - 收藏表 | `app/db/favorite_store.py` | 用户收藏的菜谱内容 | 收藏按用户隔离，防越权查询 |
-| SQLite - Checkpoint | `langgraph-checkpoint-sqlite` | LangGraph 状态快照（messages / intent / image_urls 等） | 多轮对话自动恢复，无需手动拼历史 |
-| ChromaDB | `db/chroma_data/` | 52 道菜谱的向量索引 + metadata | 本地持久化向量库，支持语义检索 |
+| PostgreSQL - 用户表 | `app/db/user_store.py` + SQLAlchemy async | 用户名 / 密码哈希 / 注册时间 | 企业级关系型数据库，Alembic 版本化迁移 |
+| PostgreSQL - 会话表 | `app/db/session_store.py` | thread_id 与 user_id 映射、会话标题 | `ON CONFLICT` 原子 upsert，会话列表与权限隔离 |
+| PostgreSQL - 收藏表 | `app/db/favorite_store.py` | 用户收藏的菜谱内容 | 收藏按用户隔离，防越权查询 |
+| PostgreSQL - Checkpoint | `langgraph-checkpoint-postgres` | LangGraph 状态快照（messages / intent / image_urls 等） | 官方 AsyncPostgresSaver，多轮对话自动恢复 |
+| ChromaDB | `db/chroma_data/` | 100 道菜谱的向量索引 + metadata | 本地持久化向量库，支持语义检索 |
 | 阿里云 OSS | 外部服务 | 用户上传的食材图片 | 预签名直传，后端零带宽转发 |
 
 ### 核心技术流程 —— 三阶段 RAG 检索
@@ -151,7 +151,7 @@ flowchart LR
 ```
 
 **离线阶段**：
-1. `recipe_data.py` 定义 52 道菜谱结构化数据
+1. `recipe_data.py` 定义 100 道菜谱结构化数据
 2. `vector_store.py` 启动时检测 ChromaDB collection 为空，自动调用 DashScope `text-embedding-v3` 批量向量化并灌入（`EMBEDDING_BATCH_SIZE=10`）
 
 **在线阶段**：
@@ -181,14 +181,16 @@ ai私厨/
 │   │   └── handlers.py           # 全局异常处理器
 │   ├── common/logger.py          # loguru 日志配置
 │   ├── db/
-│   │   ├── user_store.py         # 用户表 SQLite 操作
-│   │   ├── session_store.py      # 会话表 + 孤儿会话自动关联
+│   │   ├── database.py           # SQLAlchemy async engine + 会话工厂
+│   │   ├── models.py             # ORM 模型（users / sessions / favorites）
+│   │   ├── user_store.py         # 用户表异步操作
+│   │   ├── session_store.py      # 会话表 + ON CONFLICT 原子 upsert
 │   │   └── favorite_store.py     # 收藏表（按 user_id 隔离）
 │   ├── models/schemas.py         # Pydantic 请求 / 响应模型
 │   ├── rag/
 │   │   ├── pipeline.py           # ★ 三阶段 RAG 检索管道 + 全链路降级
-│   │   ├── vector_store.py       # ChromaDB 向量库初始化 + 52 道菜谱自动灌入
-│   │   └── recipe_data.py        # 52 道菜谱原始结构化数据
+│   │   ├── vector_store.py       # ChromaDB 向量库初始化 + 100 道菜谱自动灌入
+│   │   └── recipe_data.py        # 100 道菜谱原始结构化数据
 │   └── main.py                   # FastAPI 入口：路由注册、CORS、静态托管、健康检查
 ├── frontend/
 │   ├── app/
@@ -236,7 +238,14 @@ cp .env.example .env
 # 编辑 .env 填入 DASHSCOPE_API_KEY、TAVILY_API_KEY、OSS_*、JWT_SECRET_KEY
 ```
 
-### 3. 启动后端
+### 3. 启动 PostgreSQL 并执行数据库迁移
+
+```bash
+docker compose up -d          # 启动 PostgreSQL 17（读取 .env 中 POSTGRES_* 配置）
+uv run alembic upgrade head   # 创建 users / sessions / favorites 业务表
+```
+
+### 4. 启动后端
 
 ```bash
 uv run python -m app.main
@@ -246,7 +255,7 @@ uv run uvicorn app.main:app --reload
 
 后端服务地址：`http://127.0.0.1:8001`
 
-### 4. 启动前端
+### 5. 启动前端
 
 ```bash
 cd frontend
@@ -359,10 +368,10 @@ flowchart TD
     LOOP -->|调联网| WEB[Tavily web_search]:::tool
     LOOP -->|调收藏| FAV[save_favorite_recipe<br/>闭包锁定 user_id]:::tool
     RAG --> CHROMA[(ChromaDB)]:::store
-    FAV --> SQL[(SQLite 收藏表)]:::store
+    FAV --> SQL[(PostgreSQL 收藏表)]:::store
     LOOP --> SSE[SSE 流式返回 token]:::api
     SSE --> U
-    LOOP --> CP[(SQLite Checkpoint)]:::store
+    LOOP --> CP[(PostgreSQL Checkpoint)]:::store
 ```
 
 **步骤拆解**：
@@ -375,5 +384,5 @@ flowchart TD
    - 节点自带专属 System Prompt 与工具集（如营养节点不加载联网搜索工具）
    - `_run_agent_with_tools` 循环：LLM 自主决定是否调工具、调哪个、调几次，最多 5 轮
    - 收藏工具通过 `make_save_favorite_tool(user_id)` 闭包生成，`user_id` 锁在函数体内不暴露给 LLM
-6. **流式输出**：`graph.stream(..., stream_mode="messages")` 逐 chunk  yield，FastAPI `StreamingResponse` 以 `text/event-stream` 推送
-7. **状态持久化**：`SqliteSaver` Checkpoint 按 `thread_id` 自动保存整个 state，下次请求带同一 `thread_id` 自动恢复历史上下文
+6. **流式输出**：`graph.astream(..., stream_mode="messages")` 逐 chunk yield，FastAPI `StreamingResponse` 以 `text/event-stream` 推送
+7. **状态持久化**：`AsyncPostgresSaver` Checkpoint 按 `thread_id` 自动保存整个 state，下次请求带同一 `thread_id` 自动恢复历史上下文

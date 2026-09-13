@@ -49,7 +49,7 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
     """
@@ -60,7 +60,7 @@ def get_current_user(
         raise AuthException(message="Token 无效")
 
     user_id = payload.get("user_id")
-    user = user_store.get_user_by_id(user_id)
+    user = await user_store.get_user_by_id(user_id)
     if user is None:
         raise AuthException(message="用户不存在")
     return user

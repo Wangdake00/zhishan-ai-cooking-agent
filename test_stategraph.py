@@ -8,14 +8,15 @@
   1. 图结构验证（StateGraph 编译、节点/边完整性）
   2. 意图路由测试（nutrition / recipe / general）
   3. 工具调用测试（RAG 检索、营养计算、购物清单）
-  4. 多轮对话持久化（SqliteSaver checkpoint）
+  4. 多轮对话持久化（AsyncPostgresSaver checkpoint）
   5. 流式对话接口（stream_chat）
   6. 会话管理（列表、历史消息、删除）
+
+注意: 数据库已迁移至 PostgreSQL + AsyncPostgresSaver，
+      所有测试在单个事件循环内运行，图调用统一使用 ainvoke。
 """
 
 import asyncio
-import json
-import os
 import sys
 
 from langchain_core.messages import HumanMessage, AIMessage
@@ -28,7 +29,21 @@ from app.agents.graph import (
     get_messages,
     delete_session,
 )
-from app.common.logger import logger
+
+
+def _run(coro):
+    """Windows 上 psycopg async（AsyncPostgresSaver）需要 SelectorEventLoop"""
+    if sys.platform == "win32":
+        return asyncio.run(coro, loop_factory=asyncio.SelectorEventLoop)
+    return asyncio.run(coro)
+
+
+def _reset_singletons():
+    """重置 graph 单例，让连接绑定当前事件循环"""
+    import app.agents.graph as g
+    g._checkpointer = None
+    g._checkpointer_cm = None
+    g._compiled_graph = None
 
 
 # ========== 颜色输出 ==========
@@ -59,9 +74,9 @@ def section(title: str):
 
 
 # ========== 测试 1: 图结构验证 ==========
-def test_graph_structure():
+async def test_graph_structure():
     section("测试 1: 图结构验证")
-    g = get_graph()
+    g = await get_graph()
     check("StateGraph 编译成功", g is not None)
 
     # 检查节点
@@ -75,7 +90,7 @@ def test_graph_structure():
 
 
 # ========== 测试 2: 意图路由 ==========
-def test_intent_routing():
+async def test_intent_routing():
     section("测试 2: 意图检测（关键词路由）")
 
     # Nutrition 意图
@@ -116,15 +131,15 @@ def test_intent_routing():
 
 
 # ========== 测试 3: 子图执行 ==========
-def test_subgraph_execution():
+async def test_subgraph_execution():
     section("测试 3: 子图节点执行")
-    g = get_graph()
+    g = await get_graph()
 
     thread_id = "test_nutrition_flow"
     config = {"configurable": {"thread_id": thread_id}}
 
     # Nutrition Flow
-    result = g.invoke({
+    result = await g.ainvoke({
         "messages": [HumanMessage(content="帮我算一下50g鸡胸肉的营养成分")],
         "user_id": 1,
         "thread_id": thread_id,
@@ -143,18 +158,18 @@ def test_subgraph_execution():
               f"内容: {str(content)[:80]}...")
 
     # 清理
-    delete_session(thread_id, user_id=1)
+    await delete_session(thread_id, user_id=1)
 
 
 # ========== 测试 4: RAG 工具调用 ==========
-def test_rag_tool():
+async def test_rag_tool():
     section("测试 4: RAG 菜谱检索工具")
-    g = get_graph()
+    g = await get_graph()
 
     thread_id = "test_rag_flow"
     config = {"configurable": {"thread_id": thread_id}}
 
-    result = g.invoke({
+    result = await g.ainvoke({
         "messages": [HumanMessage(content="推荐几道清淡的减脂餐")],
         "user_id": 1,
         "thread_id": thread_id,
@@ -172,19 +187,19 @@ def test_rag_tool():
         has_rag = "🔍" in content or "菜谱" in content or "做法" in content
         check("RAG 检索结果包含菜谱", has_rag, f"内容: {content[:100]}...")
 
-    delete_session(thread_id, user_id=1)
+    await delete_session(thread_id, user_id=1)
 
 
 # ========== 测试 5: 多轮对话持久化 ==========
-def test_multi_turn():
-    section("测试 5: 多轮对话持久化")
-    g = get_graph()
+async def test_multi_turn():
+    section("测试 5: 多轮对话持久化（PostgreSQL Checkpoint）")
+    g = await get_graph()
 
     thread_id = "test_multi_turn"
     config = {"configurable": {"thread_id": thread_id}}
 
     # 第一轮
-    result1 = g.invoke({
+    result1 = await g.ainvoke({
         "messages": [HumanMessage(content="你好")],
         "user_id": 1,
         "thread_id": thread_id,
@@ -197,7 +212,7 @@ def test_multi_turn():
     check("第 1 轮完成", len(msgs1) == 2, f"用户+AI = {len(msgs1)} 条")
 
     # 第二轮（会继承第一轮消息）
-    result2 = g.invoke({
+    result2 = await g.ainvoke({
         "messages": [HumanMessage(content="帮我推荐菜谱")],
         "user_id": 1,
         "thread_id": thread_id,
@@ -210,7 +225,7 @@ def test_multi_turn():
     check("第 2 轮完成（含历史）", len(msgs2) >= 3, f"共 {len(msgs2)} 条")
 
     # 第三轮
-    result3 = g.invoke({
+    result3 = await g.ainvoke({
         "messages": [HumanMessage(content="这些菜谱多少卡")],
         "user_id": 1,
         "thread_id": thread_id,
@@ -223,21 +238,25 @@ def test_multi_turn():
     check("第 3 轮完成（含历史）", len(msgs3) >= 4, f"共 {len(msgs3)} 条")
 
     # 验证持久化
-    persisted = get_messages(thread_id)
+    persisted = await get_messages(thread_id)
     check("持久化消息数", len(persisted) >= 4, f"Checkpoint 中 {len(persisted)} 条消息")
 
-    delete_session(thread_id, user_id=1)
+    await delete_session(thread_id, user_id=1)
 
 
 # ========== 测试 6: 会话管理 ==========
-def test_session_management():
+async def test_session_management():
     section("测试 6: 会话管理")
 
-    # 先创建一些会话
-    g = get_graph()
+    from app.db import session_store
+
+    # 会话元数据由 API 层通过 upsert_session 创建（与 chat.py 流程一致），
+    # 直接 ainvoke 只写 checkpoint 不写 sessions 表
+    g = await get_graph()
     for i in range(3):
         thread_id = f"test_session_{i}"
-        g.invoke({
+        await session_store.upsert_session(thread_id, user_id=99, title=f"测试会话 {i}")
+        await g.ainvoke({
             "messages": [HumanMessage(content=f"测试会话 {i}")],
             "user_id": 99,
             "thread_id": thread_id,
@@ -246,23 +265,23 @@ def test_session_management():
             "intent": "general",
         }, {"configurable": {"thread_id": thread_id}})
 
-    sessions = list_sessions(user_id=99)
+    sessions = await list_sessions(user_id=99)
     check("列出会话", len(sessions) >= 3, f"用户 99 有 {len(sessions)} 个会话")
 
     # 删除一个
     if sessions:
         tid = sessions[0]["thread_id"]
-        delete_session(tid, user_id=99)
-        sessions_after = list_sessions(user_id=99)
+        await delete_session(tid, user_id=99)
+        sessions_after = await list_sessions(user_id=99)
         check("删除会话", len(sessions_after) < len(sessions),
               f"删除前 {len(sessions)}，删除后 {len(sessions_after)}")
 
         # 清理剩余
         for s in sessions_after:
-            delete_session(s["thread_id"], user_id=99)
+            await delete_session(s["thread_id"], user_id=99)
 
     # 验证空
-    empty_sessions = list_sessions(user_id=99)
+    empty_sessions = await list_sessions(user_id=99)
     check("清理后无会话", len(empty_sessions) == 0, f"剩余 {len(empty_sessions)} 个")
 
 
@@ -285,7 +304,7 @@ async def test_streaming():
     check("流式回复包含自我介绍", "你好" in total or "烹饪" in total or "助手" in total,
           f"前 100 字: {total[:100]}...")
 
-    delete_session(thread_id, user_id=1)
+    await delete_session(thread_id, user_id=1)
 
 
 # ========== 主入口 ==========
@@ -299,12 +318,12 @@ async def main():
     print(f"{CYAN}{'#'*60}{RESET}")
 
     try:
-        test_graph_structure()
-        test_intent_routing()
-        test_subgraph_execution()
-        test_rag_tool()
-        test_multi_turn()
-        test_session_management()
+        await test_graph_structure()
+        await test_intent_routing()
+        await test_subgraph_execution()
+        await test_rag_tool()
+        await test_multi_turn()
+        await test_session_management()
         await test_streaming()
     except Exception as e:
         print(f"\n{RED}{'!'*60}{RESET}")
@@ -328,4 +347,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    _reset_singletons()
+    _run(main())

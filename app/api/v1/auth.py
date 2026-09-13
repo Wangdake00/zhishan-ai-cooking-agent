@@ -2,6 +2,7 @@
 用户认证路由：注册、登录、获取当前用户
 """
 from fastapi import APIRouter, Depends
+from sqlalchemy.exc import IntegrityError
 
 from app.core.auth import (
     hash_password,
@@ -22,17 +23,15 @@ router = APIRouter()
 @router.post("/auth/register", response_model=TokenResponse)
 async def register(request: RegisterRequest):
     """注册新用户"""
-    if user_store.get_user_by_username(request.username):
+    if await user_store.get_user_by_username(request.username):
         raise UsernameExistsException()
 
     password_hash = hash_password(request.password)
-    user = user_store.create_user(request.username, password_hash)
-
-    # 将孤儿会话（user_id 指向不存在用户）关联到新注册用户
-    assigned = session_store.assign_orphan_sessions_to_user(user["id"])
-    if assigned > 0:
-        from app.common.logger import logger
-        logger.info(f"新用户 {request.username} 注册，已关联 {assigned} 条历史会话")
+    try:
+        user = await user_store.create_user(request.username, password_hash)
+    except IntegrityError:
+        # 并发注册同名用户的竞态兜底（数据库唯一约束触发），返回业务错误而非 500
+        raise UsernameExistsException()
 
     token = create_access_token(user["id"], user["username"])
     return TokenResponse(
@@ -48,17 +47,9 @@ async def register(request: RegisterRequest):
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
     """用户登录"""
-    user = user_store.get_user_by_username(request.username)
+    user = await user_store.get_user_by_username(request.username)
     if not user or not verify_password(request.password, user["password_hash"]):
         raise AuthException(message="用户名或密码错误")
-
-    # 如果当前用户没有会话，尝试关联孤儿会话
-    existing_sessions = session_store.list_sessions(user["id"])
-    if len(existing_sessions) == 0:
-        assigned = session_store.assign_orphan_sessions_to_user(user["id"])
-        if assigned > 0:
-            from app.common.logger import logger
-            logger.info(f"用户 {request.username} 登录，已关联 {assigned} 条历史会话")
 
     token = create_access_token(user["id"], user["username"])
     return TokenResponse(
