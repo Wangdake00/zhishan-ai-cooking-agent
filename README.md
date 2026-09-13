@@ -269,6 +269,80 @@ npm run dev
 - 健康检查：`GET http://127.0.0.1:8001/health`
 - API 文档：`http://127.0.0.1:8001/docs`
 
+## Docker 部署
+
+一条命令完成前端构建、后端依赖安装、数据库迁移与 RAG 向量库灌入，适合 Linux 服务器生产部署。
+
+### 前置条件
+
+- 服务器已安装 Docker 20.10+ 与 Docker Compose v2（`docker compose version` 可用）
+- 已在服务器上准备好代码仓库
+- 已配置 `.env`（只需一份，postgres 与 app 共用）：
+
+```bash
+cp .env.example .env
+# 必须修改的配置：
+# 1. DASHSCOPE_API_KEY / TAVILY_API_KEY / OSS_* —— 换成真实密钥
+# 2. JWT_SECRET_KEY —— 换成强随机串（DEBUG=false 时默认弱密钥会拒绝启动）
+# 3. POSTGRES_PASSWORD —— 生产环境务必改掉默认密码
+# 说明：POSTGRES_HOST 保持 127.0.0.1 即可，compose 会自动覆盖为服务名 postgres
+```
+
+### 首次部署
+
+```bash
+# 构建镜像并启动（首次会自动执行：npm 前端构建 → uv 安装依赖 → alembic 迁移 → 灌入 100 条菜谱）
+docker compose up -d --build
+
+# 观察启动过程（迁移 + RAG 灌入约 1 分钟）
+docker compose logs -f app
+```
+
+启动完成后验证：
+
+```bash
+curl http://127.0.0.1:8001/health         # → {"status":"ok",...}
+curl http://127.0.0.1:8001/health/ready   # → {"status":"ready","database":"ok"}
+```
+
+浏览器访问 `http://<服务器IP>:8001` 即为前端页面，`/docs` 为 API 文档。
+
+### 更新部署
+
+```bash
+git pull
+docker compose up -d --build   # 重新构建并滚动替换 app 容器，数据卷不受影响
+docker image prune -f          # 可选：清理悬空的旧镜像
+```
+
+### 数据持久化
+
+| 命名卷 | 容器路径 | 内容 |
+|---|---|---|
+| `postgres_data` | `/var/lib/postgresql/data` | 用户 / 会话 / 收藏 / Checkpoint |
+| `chroma_data` | `/app/db/chroma_data` | 菜谱向量索引（重启后不重复灌入） |
+
+`docker compose down` 不会删除数据卷；**`docker compose down -v` 会清空全部数据，慎用**。
+
+### 常用运维命令
+
+```bash
+docker compose ps                  # 查看服务状态（app 应为 healthy）
+docker compose logs -f app         # 跟踪应用日志（含迁移与 RAG 灌入过程）
+docker compose restart app         # 重启应用
+docker compose exec app alembic upgrade head   # 手动执行数据库迁移
+docker compose down                # 停止（保留数据卷）
+```
+
+### 常见问题
+
+- **`/health/ready` 返回 503**：PostgreSQL 未就绪或密码不匹配。检查 `docker compose logs postgres`，确认 `.env` 中 `POSTGRES_USER/PASSWORD/DB` 与 postgres 容器一致（首次启动后修改密码需删除 `postgres_data` 卷重建）。
+- **容器反复重启，日志报 JWT_SECRET_KEY 错误**：`DEBUG=false` 时禁止默认弱密钥，在 `.env` 中设置强随机 `JWT_SECRET_KEY`（生成方式见 `.env.example`）。
+- **日志提示 RAG 预热失败**：检查 `DASHSCOPE_API_KEY` 与服务器出网；此时对话会自动降级（关键字匹配 / 联网搜索），修复密钥后 `docker compose restart app` 即可重新灌入。
+- **端口冲突**：宿主机 8001 / 5432 被占用时，在 `.env` 中改 `API_PORT` / `POSTGRES_PORT` 后重新 `up -d`（容器内端口不变）。
+- **需要重置向量库**：`docker compose exec app sh -c "rm -rf /app/db/chroma_data/*"` 后重启容器，会重新灌入 100 条菜谱。
+- **数据库端口安全**：postgres 仅绑定 `127.0.0.1`，不向公网暴露；远程访问请走 SSH 隧道。
+
 ## 环境变量
 
 ### 后端（`.env`）

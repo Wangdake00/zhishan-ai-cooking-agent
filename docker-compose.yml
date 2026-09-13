@@ -2,19 +2,51 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: ai_chef_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-chief}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chief123}
       POSTGRES_DB: ${POSTGRES_DB:-ai_chef}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # 仅绑定本机回环：宿主机本地开发（POSTGRES_HOST=127.0.0.1）仍可直连，
+      # 生产环境不向公网暴露数据库端口；容器间通信走 compose 内部网络
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chief} -d ${POSTGRES_DB:-ai_chef}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chief} -d ${POSTGRES_DB:-ai_chef}" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  app:
+    build: .
+    image: zhi-shan-ai:latest
+    container_name: ai_chef_app
+    restart: unless-stopped
+    ports:
+      # 宿主机端口可用 API_PORT 覆盖；容器内固定监听 8001
+      - "${API_PORT:-8001}:8001"
+    env_file: .env
+    environment:
+      # 容器间通信必须使用 compose 服务名，
+      # 显式覆盖 .env 中面向本地开发的 POSTGRES_HOST=127.0.0.1
+      POSTGRES_HOST: postgres
+    volumes:
+      # 命名卷持久化向量库：容器重建/镜像升级后不重复灌入 100 条菜谱
+      - chroma_data:/app/db/chroma_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # /health/ready 会在数据库不可达时返回 503 → 探针失败
+      test: [ "CMD-SHELL", "python -c \"import sys, urllib.request as u; sys.exit(0 if u.urlopen('http://127.0.0.1:8001/health/ready', timeout=5).status == 200 else 1)\"" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # 覆盖首次启动的迁移 + RAG 灌入（约 1 分钟）耗时
+      start_period: 120s
+
 volumes:
   postgres_data:
+  chroma_data:
