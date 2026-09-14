@@ -4,6 +4,8 @@ StateGraph 结构图可视化
 输出: graph_mermaid.mmd (Mermaid 格式) + graph_structure.txt (文本结构图)
 """
 
+import os
+
 from app.agents.graph import get_graph
 
 
@@ -136,8 +138,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print(mermaid)
 
-    # 保存文件
-    base = os.path.dirname(os.path.abspath(__file__))
+    # 保存文件到项目根目录（tests/ 的上一级）
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     mmd_path = os.path.join(base, "graph_mermaid.mmd")
     txt_path = os.path.join(base, "graph_structure.txt")
 

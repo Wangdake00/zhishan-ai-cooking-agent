@@ -41,11 +41,13 @@ frontend/tsconfig.tsbuildinfo
 app/static/
 
 # ---------- 测试 / 调试产物（本地开发用，不进镜像） ----------
+tests/
 test_*.py
 graph_mermaid.mmd
 graph_structure.txt
 views/
 **/*.png
+**/*.jpg
 
 # ---------- IDE / 系统文件 ----------
 .idea/
