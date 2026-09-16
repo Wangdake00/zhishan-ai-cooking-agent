@@ -3,6 +3,7 @@
 
 独立维护 favorites 表，用户可以收藏喜欢的食谱，支持查看、删除。
 """
+from datetime import timezone
 from typing import Optional
 
 from sqlalchemy import delete, select
@@ -14,14 +15,14 @@ from app.db.models import Favorite
 
 
 def _to_dict(row: Favorite) -> dict:
-    """ORM 对象转 dict，时间序列化为 ISO 字符串（保持 API 契约不变）"""
+    """ORM 对象转 dict，时间序列化为带 UTC 时区标记的 ISO 字符串"""
     return {
         "id": row.id,
         "title": row.title,
         "content": row.content,
         "ingredients": row.ingredients,
-        "created_at": row.created_at.isoformat(timespec="seconds"),
-        "updated_at": row.updated_at.isoformat(timespec="seconds"),
+        "created_at": row.created_at.replace(tzinfo=timezone.utc).isoformat(timespec="seconds"),
+        "updated_at": row.updated_at.replace(tzinfo=timezone.utc).isoformat(timespec="seconds"),
     }
 
 

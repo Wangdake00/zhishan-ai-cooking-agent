@@ -1,6 +1,7 @@
 """
 用户数据存储（PostgreSQL / SQLAlchemy 2.0 async）
 """
+from datetime import timezone
 from typing import Optional
 
 from sqlalchemy import select
@@ -11,11 +12,11 @@ from app.db.models import User
 
 
 def _to_dict(user: User, with_password: bool = False) -> dict:
-    """ORM 对象转 dict，时间序列化为 ISO 字符串（保持 API 契约不变）"""
+    """ORM 对象转 dict，时间序列化为带 UTC 时区标记的 ISO 字符串"""
     data = {
         "id": user.id,
         "username": user.username,
-        "created_at": user.created_at.isoformat(timespec="seconds"),
+        "created_at": user.created_at.replace(tzinfo=timezone.utc).isoformat(timespec="seconds"),
     }
     if with_password:
         data["password_hash"] = user.password_hash

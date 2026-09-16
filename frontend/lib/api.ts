@@ -218,6 +218,29 @@ export async function deleteSession(threadId: string): Promise<void> {
     }
 }
 
+// ========== 语音识别相关 ==========
+
+/**
+ * 语音转文字：上传音频文件，返回转写文本
+ */
+export async function transcribeAudio(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append("audio", file);
+
+    const response = await fetch(`${API_BASE}/api/v1/chat/transcribe`, {
+        method: "POST",
+        body: formData,
+        headers: getAuthHeaders(), // 不能设 Content-Type，浏览器自动设 multipart boundary
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || data.message || "语音识别失败");
+    }
+    const data = await response.json();
+    return data.text;
+}
+
 // ========== 收藏食谱相关 ==========
 
 /**

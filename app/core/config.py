@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     rag_top_k: int = 10
     rag_top_n: int = 5
 
+    # ========== 语音识别（STT） ==========
+    # DashScope Paraformer 实时语音识别模型
+    asr_model: str = "paraformer-realtime-v2"
+
     # ========== Tavily（Agent 联网搜索工具） ==========
     tavily_api_key: str = ""
 

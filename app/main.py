@@ -7,6 +7,7 @@ from app.api.v1 import chat
 from app.api.v1 import oss
 from app.api.v1 import auth
 from app.api.v1 import favorites
+from app.api.v1 import voice
 from app.common.logger import setup_logging
 from app.core.config import settings
 from app.core.handlers import register_exception_handlers
@@ -42,6 +43,7 @@ app.include_router(auth.router, prefix="/api/v1", tags=["用户认证"])
 app.include_router(chat.router, prefix="/api/v1", tags=["对话"])
 app.include_router(oss.router, prefix="/api/v1", tags=["申请上传签名url"])
 app.include_router(favorites.router, prefix="/api/v1", tags=["收藏食谱"])
+app.include_router(voice.router, prefix="/api/v1", tags=["语音识别"])
 
 # 3.健康检查端点
 @app.get("/health")

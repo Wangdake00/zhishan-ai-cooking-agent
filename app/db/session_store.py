@@ -4,6 +4,7 @@
 独立于 LangGraph 的 checkpoint 表，单独维护一张 sessions 表，
 用于列出所有会话、记录标题与更新时间，避免依赖 checkpointer 的内部表结构。
 """
+from datetime import timezone
 from typing import Optional
 
 from sqlalchemy import delete as sa_delete, func, select
@@ -15,13 +16,13 @@ from app.db.models import SessionModel
 
 
 def _to_dict(row: SessionModel) -> dict:
-    """ORM 对象转 dict，时间序列化为 ISO 字符串（保持 API 契约不变）"""
+    """ORM 对象转 dict，时间序列化为带 UTC 时区标记的 ISO 字符串"""
     return {
         "thread_id": row.thread_id,
         "user_id": row.user_id,
         "title": row.title,
-        "created_at": row.created_at.isoformat(timespec="seconds"),
-        "updated_at": row.updated_at.isoformat(timespec="seconds"),
+        "created_at": row.created_at.replace(tzinfo=timezone.utc).isoformat(timespec="seconds"),
+        "updated_at": row.updated_at.replace(tzinfo=timezone.utc).isoformat(timespec="seconds"),
     }
 
 
