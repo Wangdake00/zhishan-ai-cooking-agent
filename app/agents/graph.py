@@ -34,6 +34,14 @@ from app.core.exceptions import RAGException
 from app.db import session_store, favorite_store
 from app.rag.pipeline import rag_search
 from app.agents.utils import ensure_image_base64_data_url
+from app.agents.grounding import (
+    extract_nutrition_facts,
+    extract_recipe_facts,
+    verify_nutrition,
+    verify_recipes,
+    render_nutrition_card,
+    render_recipe_card,
+)
 
 
 # ========== 状态定义 ==========
@@ -53,6 +61,9 @@ class AgentState(TypedDict, total=False):
     thread_id: str
     user_prompt: str
     image_urls: list
+    # 防幻觉接地事实（由确定性工具产出，覆盖语义；流末渲染权威数据卡 + 一致性校验）
+    nutrition_facts: Optional[dict]
+    recipe_facts: Optional[dict]
 
 
 # ========== 工具定义 ==========
@@ -466,6 +477,11 @@ SYSTEM_PROMPTS = {
 - 鸡蛋 1.5~3 个、西红柿 1 个、肉类 80~180g、叶菜 80~200g、主食 80~150g
 - 调料按整道菜适量，不要按人份倍增
 
+🔒 数据接地（必须严格遵守）：
+- 必须先调用 calculate_nutrition，再给结论；禁止不调工具凭记忆报数值
+- 回答中的总卡路里/蛋白质/脂肪/碳水/纤维必须与工具返回的"营养汇总"完全一致，不得自行重算或四舍五入到另一个数
+- 工具表格中标注"未找到该食材的营养数据"的食材，必须明确告知用户"该食材暂无数据、未计入总计"，严禁编造其数值
+
 请使用以下结构输出：
 ### 📊 营养成分分析报告
 - 各食材营养明细表格
@@ -480,7 +496,12 @@ SYSTEM_PROMPTS = {
 4. 排序推荐：从「食材匹配度 + 难度 + 营养」三维评分排序
 
 ⚠️ 避免幻觉：调用 generate_shopping_list 前，将食材换算为"1人份合理用量"
-- 每次工具调用后，用中文友好总结结果""",
+- 每次工具调用后，用中文友好总结结果
+
+🔒 菜谱接地（必须严格遵守）：
+- 必须先调用 search_recipes_rag 检索本地知识库
+- 推荐的菜名、食材、做法只能来自检索结果，并在菜名后标注来源序号（如 [1][2]）；严禁编造知识库中不存在的菜名或把 A 菜的做法安到 B 菜上
+- 若检索结果为空，必须明确告知"本地知识库暂未找到相关菜谱"，再用 web_search 联网搜索，不得虚构""",
 
     "general": """你是一名全能智能烹饪助手，具备强大的 Function Calling 和 RAG 检索增强生成能力。
 
@@ -492,7 +513,9 @@ SYSTEM_PROMPTS = {
 4. save_favorite_recipe (收藏食谱)
 
 ⚠️ 避免幻觉：调用 calculate_nutrition / generate_shopping_list 前，将食材换算为"1人份合理用量"
-- 每次工具调用后，用中文友好总结""",
+- 每次工具调用后，用中文友好总结
+
+🔒 接地原则：营养数值必须来自 calculate_nutrition、菜谱必须来自 search_recipes_rag 的检索结果，不得凭记忆编造；检索/数据库没有的内容要明确说明"暂无数据/未找到"，不要虚构具体数字或菜名""",
 }
 
 
@@ -540,7 +563,12 @@ def detect_intent(state: AgentState) -> dict:
 
 # ========== Agent 执行核心（带工具循环） ==========
 
-async def _run_agent_with_tools(messages: list, tools: list, max_iterations: int = 5) -> list:
+async def _run_agent_with_tools(
+    messages: list,
+    tools: list,
+    max_iterations: int = 5,
+    required_tool: Optional[str] = None,
+) -> tuple[list, list[dict]]:
     """
     执行带工具调用的 Agent 循环（异步）
 
@@ -549,18 +577,24 @@ async def _run_agent_with_tools(messages: list, tools: list, max_iterations: int
     - 工具统一通过 ainvoke 调用：async 工具（如收藏）原生执行，
       同步工具（RAG/Tavily/计算类）自动转入线程池执行，避免冻结事件循环
       —— 这是修复"async-only 收藏工具在同步循环中必失败"的关键
+    - 防幻觉门控：required_tool 指定本轮必须先调用的确定性工具（如营养计算 /
+      RAG 检索）。模型若在调用它之前就直接作答，会被注入纠错指令并强制继续，
+      从功能层杜绝"跳过工具、凭记忆编造"。
 
     Args:
         messages: 初始消息列表
         tools: 可用工具列表
         max_iterations: 最大工具调用轮数
+        required_tool: 结束回答前必须调用过的工具名（None 表示不强制）
 
     Returns:
-        完整的消息列表（包含工具调用和结果）
+        (完整的消息列表（含工具调用和结果）, 工具调用轨迹 [{"name","result"}])
     """
     tool_map = {t.name: t for t in tools}
     current_messages = list(messages)
     model_with_tools = _model.bind_tools(tools)
+    tool_traces: list[dict] = []
+    called_tool_names: set[str] = set()
 
     logger.debug(f"[_run_agent_with_tools] 输入消息数: {len(messages)}, 工具数: {len([t.name for t in tools])}")
 
@@ -575,6 +609,19 @@ async def _run_agent_with_tools(messages: list, tools: list, max_iterations: int
             logger.debug(f"[_run_agent_with_tools]   LLM 文本回复预览: {response.content[:120]}")
 
         if not hasattr(response, "tool_calls") or not response.tool_calls:
+            # 防幻觉门控：必需工具尚未调用时，不允许就此作答，注入纠错指令后继续
+            if (
+                required_tool
+                and required_tool not in called_tool_names
+                and iteration < max_iterations - 1
+            ):
+                logger.info(f"[_run_agent_with_tools] ⛔ 模型未调用必需工具 {required_tool} 即作答，强制门控")
+                current_messages.append(HumanMessage(content=(
+                    f"【系统纠正】你还没有调用 `{required_tool}` 工具获取真实数据。"
+                    f"请立即调用 `{required_tool}`，并严格基于其返回结果作答；"
+                    "在拿到工具结果前，禁止凭记忆编造任何数值或菜谱。"
+                )))
+                continue
             logger.info(f"[_run_agent_with_tools] 无工具调用，结束循环。当前总消息数: {len(current_messages)}")
             break
 
@@ -593,12 +640,18 @@ async def _run_agent_with_tools(messages: list, tools: list, max_iterations: int
                     logger.error(f"[_run_agent_with_tools]   ❌ {tool_name} 执行失败: {e}")
                     tool_result = f"❌ 工具执行失败：{str(e)}"
 
+                called_tool_names.add(tool_name)
+                tool_traces.append({"name": tool_name, "result": str(tool_result)})
                 current_messages.append(
                     ToolMessage(content=tool_result, tool_call_id=call_id)
                 )
 
-    logger.info(f"[_run_agent_with_tools] 完成！输出消息数: {len(current_messages)}")
-    return current_messages
+    # 门控兜底：达到迭代上限仍未调用必需工具，记录警告（流末权威卡片会自然缺失）
+    if required_tool and required_tool not in called_tool_names:
+        logger.warning(f"[_run_agent_with_tools] 达到最大迭代 {max_iterations} 次，仍未调用必需工具 {required_tool}")
+
+    logger.info(f"[_run_agent_with_tools] 完成！输出消息数: {len(current_messages)}, 工具轨迹: {[t['name'] for t in tool_traces]}")
+    return current_messages, tool_traces
 
 
 def _format_messages_debug(messages: list) -> str:
@@ -651,12 +704,15 @@ async def nutrition_node(state: AgentState) -> dict:
     logger.debug(f"[nutrition_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
-        result_messages = await _run_agent_with_tools(messages, tools)
+        result_messages, tool_traces = await _run_agent_with_tools(
+            messages, tools, required_tool="calculate_nutrition"
+        )
         new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
+        nutrition_facts = extract_nutrition_facts(tool_traces)
         logger.debug(f"[nutrition_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
         logger.debug(f"[nutrition_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
         logger.debug(f"[nutrition_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
-        return {"messages": new_ai_messages}
+        return {"messages": new_ai_messages, "nutrition_facts": nutrition_facts}
     except Exception as e:
         logger.error(f"[nutrition_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 营养分析处理失败：{str(e)}")
@@ -679,12 +735,15 @@ async def recipe_node(state: AgentState) -> dict:
     logger.debug(f"[recipe_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
-        result_messages = await _run_agent_with_tools(messages, tools)
+        result_messages, tool_traces = await _run_agent_with_tools(
+            messages, tools, required_tool="search_recipes_rag"
+        )
         new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
+        recipe_facts = extract_recipe_facts(tool_traces)
         logger.debug(f"[recipe_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
         logger.debug(f"[recipe_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
         logger.debug(f"[recipe_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
-        return {"messages": new_ai_messages}
+        return {"messages": new_ai_messages, "recipe_facts": recipe_facts}
     except Exception as e:
         logger.error(f"[recipe_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 菜谱推荐处理失败：{str(e)}")
@@ -707,12 +766,19 @@ async def general_node(state: AgentState) -> dict:
     logger.debug(f"[general_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
-        result_messages = await _run_agent_with_tools(messages, tools)
+        result_messages, tool_traces = await _run_agent_with_tools(messages, tools)
         new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
+        # 通用意图不强制工具，但若模型主动调用了营养/菜谱工具，同样提取事实做接地
+        nutrition_facts = extract_nutrition_facts(tool_traces)
+        recipe_facts = extract_recipe_facts(tool_traces)
         logger.debug(f"[general_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
         logger.debug(f"[general_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
         logger.debug(f"[general_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
-        return {"messages": new_ai_messages}
+        return {
+            "messages": new_ai_messages,
+            "nutrition_facts": nutrition_facts,
+            "recipe_facts": recipe_facts,
+        }
     except Exception as e:
         logger.error(f"[general_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 对话处理失败：{str(e)}")
@@ -788,6 +854,31 @@ async def get_graph():
 
 # ========== 流式对话入口 ==========
 
+async def _ground_and_verify(
+    answer: str,
+    nutrition_facts: Optional[dict],
+    recipe_facts: Optional[dict],
+):
+    """
+    流末接地（防幻觉）：基于确定性工具产出的事实，生成一致性校正提示与权威数据卡。
+
+    - 全部为纯字符串渲染，零额外 LLM 调用；
+    - 以 chunk 形式 yield，直接拼接到已流式下发的正文末尾；
+    - 顺序：先给出醒目的校验警示，再附上工具事实直出的权威卡片（正确值兜底）。
+    """
+    if nutrition_facts:
+        for v in verify_nutrition(answer, nutrition_facts):
+            yield f"\n\n> ⚠️ **数据校验**：{v}\n"
+        yield render_nutrition_card(nutrition_facts)
+
+    if recipe_facts:
+        for v in verify_recipes(answer, recipe_facts):
+            yield f"\n\n> ⚠️ **来源校验**：{v}\n"
+        card = render_recipe_card(recipe_facts)
+        if card:
+            yield card
+
+
 async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: int):
     """
     基于 StateGraph 的流式对话
@@ -852,6 +943,7 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
             logger.warning(f"[stream_chat] 读取 checkpoint 失败: {e}")
 
         total_chunks = 0
+        answer_parts: list[str] = []  # 累积实际下发给用户的文本，供流末接地校验
         async for event in graph.astream(
             {
                 "messages": [message],
@@ -862,26 +954,40 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
                 "intent": "general",
             },
             {"configurable": {"thread_id": thread_id}},
-            stream_mode="messages"
+            stream_mode="messages",
+            durability="sync",  # 同步 checkpoint：确保每个 superstep 的持久化写入完成后再进入下一步
+                               # 避免客户端断连时最后几个 superstep 的 checkpoint 来不及 flush 导致消息丢失
         ):
             if isinstance(event, tuple):
                 chunk, metadata = event
                 if isinstance(chunk, AIMessageChunk) and chunk.content:
                     total_chunks += 1
+                    answer_parts.append(chunk.content)
                     yield chunk.content
 
-        logger.info(f"[stream_chat] ✅ 完成流式输出: 共 {total_chunks} 个 content chunk")
+        full_answer = "".join(answer_parts)
+        logger.info(f"[stream_chat] ✅ 完成流式输出: 共 {total_chunks} 个 content chunk, 正文 {len(full_answer)} 字")
 
-        # debug: 调用后查看 checkpoint 中保存的消息
+        # ===== 防幻觉接地：流末从 checkpoint 取工具事实，追加权威卡片 + 一致性校验 =====
         try:
             after_checkpoint = await cp.aget({"configurable": {"thread_id": thread_id}})
-            if after_checkpoint and after_checkpoint.get("channel_values"):
-                after_msgs = after_checkpoint["channel_values"].get("messages", [])
+            channel_values = (after_checkpoint or {}).get("channel_values") or {}
+
+            # debug: 调用后查看 checkpoint 中保存的消息
+            after_msgs = channel_values.get("messages", [])
+            if after_msgs:
                 logger.debug(f"[stream_chat] 执行后 Checkpoint 保存的消息数: {len(after_msgs)}")
-                if after_msgs:
-                    logger.debug(f"[stream_chat] 执行后消息详情:\n{_format_messages_debug(after_msgs)}")
+                logger.debug(f"[stream_chat] 执行后消息详情:\n{_format_messages_debug(after_msgs)}")
+
+            async for grounded in _ground_and_verify(
+                full_answer,
+                channel_values.get("nutrition_facts"),
+                channel_values.get("recipe_facts"),
+            ):
+                yield grounded
         except Exception as e:
-            logger.warning(f"[stream_chat] 执行后读取 checkpoint 失败: {e}")
+            # 接地属于增强能力，绝不能因此影响主回答
+            logger.warning(f"[stream_chat] 接地校验/卡片渲染失败（已忽略）: {e}")
 
     except Exception as e:
         tb = traceback.format_exc()
@@ -914,7 +1020,12 @@ async def delete_session(thread_id: str, user_id: int):
 
 
 async def get_messages(thread_id: str) -> list:
-    """获取会话历史消息"""
+    """获取会话历史消息
+    
+    返回格式兼容前端多模态渲染：
+    - 用户消息 content 可能是 str 或 list[dict]（LangChain image_url 格式）
+    - 同时提供 content_parts 便于前端直接消费多模态结构
+    """
     logger.info(f"获取历史消息，thread_id: {thread_id}")
     cp = await _get_checkpointer()
     checkpoint = await cp.aget({"configurable": {"thread_id": thread_id}})
@@ -934,9 +1045,13 @@ async def get_messages(thread_id: str) -> list:
     for msg in messages:
         if not msg.content:
             continue
-        if isinstance(msg, HumanMessage):
-            result.append({"role": "user", "content": msg.content})
-        elif isinstance(msg, AIMessage):
-            result.append({"role": "assistant", "content": msg.content})
+        # LangChain Message 对象序列化为 dict 时的 content 字段
+        # 可能是 str（纯文本）或 list[dict]（多模态 content_blocks）
+        content = msg.content
+        role = "user" if isinstance(msg, HumanMessage) else "assistant" if isinstance(msg, AIMessage) else None
+        if role is None:
+            continue
+        result.append({"role": role, "content": content})
 
+    logger.info(f"[get_messages] 返回 {len(result)} 条历史消息, thread_id={thread_id}")
     return result

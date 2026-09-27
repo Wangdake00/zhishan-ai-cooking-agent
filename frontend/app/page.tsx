@@ -76,17 +76,27 @@ export default function Home() {
             if (history && history.length > 0) {
                 const loadedMessages: Message[] = history.map((msg, index) => {
                     let content = "";
-                    let imageUrl: string | undefined;
+                    const imageUrls: string[] = [];
 
                     if (typeof msg.content === 'string') {
                         content = msg.content;
                     } else if (Array.isArray(msg.content)) {
-                        const parts = msg.content as { type: string; text?: string; url?: string }[];
+                        // LangChain 多模态 content 格式:
+                        // [{"type": "text", "text": "..."}, {"type": "image_url", "image_url": {"url": "..."}}]
+                        // 或旧版: [{"type": "text", "text": "..."}, {"type": "image", "url": "..."}]
+                        const parts = msg.content as Record<string, unknown>[];
                         for (const part of parts) {
-                            if (part.type === 'text' && part.text) {
+                            const partType = String(part.type ?? "");
+                            if (partType === 'text' && typeof part.text === 'string') {
                                 content += part.text;
-                            } else if (part.type === 'image' && part.url) {
-                                imageUrl = part.url;
+                            } else if (partType === 'image_url') {
+                                // LangChain 标准格式: { type: "image_url", image_url: { url: "..." } }
+                                const imageUrlObj = (part.image_url ?? {}) as Record<string, unknown>;
+                                const url = typeof imageUrlObj.url === 'string' ? imageUrlObj.url : undefined;
+                                if (url) imageUrls.push(url);
+                            } else if (partType === 'image' && typeof part.url === 'string') {
+                                // 兼容旧版: { type: "image", url: "..." }
+                                imageUrls.push(part.url);
                             }
                         }
                     }
@@ -95,7 +105,8 @@ export default function Home() {
                         id: `history_${index}_${Date.now()}`,
                         role: msg.role as "user" | "assistant",
                         content,
-                        imageUrl,
+                        imageUrl: imageUrls.length === 1 ? imageUrls[0] : undefined,
+                        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
                         timestamp: Date.now() - (history.length - index) * 1000,
                     };
                 });

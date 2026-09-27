@@ -49,7 +49,9 @@ def presign_endpoint(filename: str, current_user: dict = Depends(get_current_use
         content_type=content_type,
     ), expires=timedelta(seconds=3600))
 
-    # GET 有效期保留 7 天：accessUrl 会被持久化在会话消息/收藏中，需保证长期可展示
+    # GET 有效期保留 7 天（阿里云 OSS 预签名 URL 最大有效期 7 天）
+    # accessUrl 会被持久化在会话消息/收藏中，超过 7 天后会过期
+    # TODO: 后续可实现重新签名端点 /oss/access?key=xxx 动态刷新过期 URL
     get_result = client.presign(oss.GetObjectRequest(
         bucket=settings.oss_bucket,
         key=object_key,
