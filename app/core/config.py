@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     rerank_model: str = "gte-rerank"
     rag_top_k: int = 10
     rag_top_n: int = 5
+    # Rerank top1 相关性阈值：低于该分视为知识库无相关菜谱，走"未找到"链路
+    # （依据 50 条评测：负例 top1 rerank 分全部 ≤0.179，正例最低 0.173，取 0.16 可拦截 9/10 负例）
+    rag_rerank_threshold: float = 0.16
 
     # ========== 语音识别（STT） ==========
     # DashScope Paraformer 实时语音识别模型

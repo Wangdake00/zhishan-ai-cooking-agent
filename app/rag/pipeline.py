@@ -1,6 +1,6 @@
 """
 多阶段 RAG 检索管道
-Pipeline: Query 改写 → 向量召回 → Rerank 重排 → Fallback 降级
+Pipeline: Query 改写 → 向量召回 → 约束硬过滤 → Rerank 重排 → 相关性阈值拒答 → Fallback 降级
 
 设计理念：
 - 每个阶段都有独立的 Fallback 降级方案，保证全链路可用性
@@ -8,10 +8,14 @@ Pipeline: Query 改写 → 向量召回 → Rerank 重排 → Fallback 降级
 - 向量召回失败 → 降级为关键字匹配
 - Rerank 失败 → 降级为规则打分
 - 所有阶段异常不阻断主流程，记录日志后继续
+- 否定/饮食约束（"不辣""清真"）在向量空间天然失效，走规则抽取 + metadata 硬过滤
+- Rerank top1 分数低于阈值视为知识库无相关菜谱，触发"未找到"链路，不硬塞结果给 LLM
 """
 
+import ast
 import os
 import json
+import re
 from typing import List, Dict, Optional
 
 from langchain.chat_models import init_chat_model
@@ -29,6 +33,7 @@ LLM_MODEL = settings.llm_model
 RERANK_MODEL = settings.rerank_model
 RAG_TOP_K = settings.rag_top_k
 RAG_TOP_N = settings.rag_top_n
+RAG_RERANK_THRESHOLD = settings.rag_rerank_threshold
 DASHSCOPE_API_KEY = settings.dashscope_api_key
 DASHSCOPE_BASE_URL = settings.dashscope_base_url
 
@@ -182,6 +187,173 @@ def keyword_recall(keywords: List[str], top_k: int = 10) -> List[Dict]:
         return []
 
 
+# ========== Stage 2.5: 约束抽取与硬过滤（零 LLM，纯规则）==========
+# 50 条评测显示 constraint 类 query（否定/饮食约束）是唯一重灾区（MRR=0.34，占失败用例 100%），
+# 根因是否定语义在向量空间几乎失效（"不辣"与"辣"向量距离很近）。
+# 此类约束本质是结构化过滤条件，用规则抽取 + metadata 硬过滤即可覆盖。
+
+# 否定/限制词，捕获其后 1~4 个汉字作为约束目标
+_CONSTRAINT_TRIGGER_RE = re.compile(r"(?:不|别|免|戒|忌[口嘴]?|无|少)[要吃放做碰沾能加喝]?([一-龥]{1,4})")
+
+# 约束目标 → (需排除的食材/名称子串, 需排除的标签子串)；匹配时按触发词长度降序（"猪肉"先于"肉"）
+_NEGATION_RULES = [
+    ("猪肉", (["猪", "火腿", "培根", "腊肉", "猪油"], [])),
+    ("辣", (["辣椒", "干辣椒", "泡椒", "小米辣", "辣椒油"], ["辣"])),
+    ("麻", (["花椒", "麻椒", "藤椒"], ["麻辣"])),
+    ("油", (["油炸", "肥肉", "五花"], ["油炸", "红油", "油腻"])),
+    ("肉", (["猪", "牛", "羊", "鸡", "鸭", "鱼", "虾", "肉", "排骨", "火腿"], [])),
+    ("海鲜", (["虾", "蟹", "贝", "鱿鱼", "海鲜"], ["海鲜"])),
+    ("甜", (["糖醋", "白糖", "冰糖"], ["甜", "糖醋"])),
+    ("酸", (["醋", "酸菜", "泡椒"], ["酸"])),
+]
+
+# 关键词触发的硬约束（无需否定词）
+_HALAL_EXCLUDE = ["猪", "火腿", "培根", "腊肉", "猪油"]
+_LOW_CAL_KEYWORDS = ["减脂", "减肥", "低卡", "低热量", "瘦身"]
+_LOW_CAL_LIMIT = 300  # kcal/份，库内菜品热量约 210~380，300 大致保留低卡一半
+# "清淡"语义上排斥强刺激口味（仅排除麻辣/香辣等级，微辣不受影响）
+_LIGHT_EXCLUDE_TAGS = ["麻辣", "香辣", "红油", "油炸"]
+
+# 偏好标签（仅在 rerank 同分时微调排序，不做硬过滤）；其首字被否定时不生效
+_PREFER_RULES = [
+    ("清淡", ["清淡", "清蒸", "凉拌", "素"]),
+    ("酸口", ["酸", "酸甜", "醋"]),
+    ("酸甜", ["酸甜", "糖醋", "醋"]),
+    ("软烂", ["软", "烂", "炖", "蒸", "粥", "汤"]),
+    ("下饭", ["下饭"]),
+]
+
+# 每个命中偏好标签对 rerank 分的微调权重（仅作同分区分，不改变分数语义）
+_PREFER_WEIGHT = 0.02
+
+
+def _corpus_contains(term: str) -> bool:
+    """语料校验：通用排除目标必须在菜谱库的食材/菜名中真实存在，
+    避免"不舒服"→"舒服"这类否定正则的误抽"""
+    for r in RECIPES:
+        if term in r["name"] or term in "".join(r["ingredients"]):
+            return True
+    return False
+
+
+def extract_constraints(query: str) -> Dict:
+    """
+    从原始 query 抽取结构化约束（必须在改写前的原文上抽取，改写会丢失否定语义）。
+
+    Returns:
+        {
+            "exclude_ingredients": [需排除的食材/名称子串],
+            "exclude_tags": [需排除的标签子串],
+            "max_calories": int | None,
+            "prefer_tags": [偏好标签子串],
+        }
+    """
+    exclude_ingredients: List[str] = []
+    exclude_tags: List[str] = []
+    negated_targets: List[str] = []
+    max_calories: Optional[int] = None
+
+    # 1) 显式否定：不X / 别X / 无X / 忌X / 免X / 少X
+    for m in _CONSTRAINT_TRIGGER_RE.finditer(query):
+        target = m.group(1)
+        negated_targets.append(target)
+        for trigger, (ing_subs, tag_subs) in _NEGATION_RULES:
+            if trigger in target:
+                exclude_ingredients.extend(ing_subs)
+                exclude_tags.extend(tag_subs)
+                break
+        else:
+            # 未命中已知类别时，按食材原名做子串排除（如"不吃香菜"），
+            # 但必须在语料库中真实存在，防止"不舒服"→"舒服"式误抽
+            if 1 <= len(target) <= 3 and _corpus_contains(target):
+                exclude_ingredients.append(target)
+
+    # 2) 关键词硬约束
+    if "清真" in query:
+        exclude_ingredients.extend(_HALAL_EXCLUDE)
+    if any(kw in query for kw in _LOW_CAL_KEYWORDS):
+        max_calories = _LOW_CAL_LIMIT
+    if "清淡" in query:
+        exclude_tags.extend(_LIGHT_EXCLUDE_TAGS)
+
+    # 3) 偏好标签（首字被否定则跳过，如"不酸"不会触发"酸口"偏好）
+    prefer_tags: List[str] = []
+    for trigger, prefs in _PREFER_RULES:
+        if trigger in query and not any(trigger[0] in t for t in negated_targets):
+            prefer_tags.extend(prefs)
+
+    # 去重保持顺序
+    constraints = {
+        "exclude_ingredients": list(dict.fromkeys(exclude_ingredients)),
+        "exclude_tags": list(dict.fromkeys(exclude_tags)),
+        "max_calories": max_calories,
+        "prefer_tags": list(dict.fromkeys(prefer_tags)),
+    }
+    if _constraints_active(constraints):
+        logger.info(f"[RAG] 约束抽取: '{query}' → {constraints}")
+    return constraints
+
+
+def sanitize_query(query: str) -> str:
+    """
+    剔除否定短语后的"净化 query"，供向量召回和 Rerank 打分使用。
+    否定语义由规则过滤承担（apply_constraints）；embedding/rerank 模型对"不辣"≈"辣"，
+    保留否定词会污染语义打分，把"最像被排除项"的候选排到最前。
+    净化后过短（<2 字）时回退原 query。
+    """
+    cleaned = _CONSTRAINT_TRIGGER_RE.sub("", query)
+    cleaned = re.sub(r"[，。、！？；\s]+", " ", cleaned).strip()
+    return cleaned if len(cleaned) >= 2 else query
+
+
+def _constraints_active(constraints: Dict) -> bool:
+    return bool(
+        constraints["exclude_ingredients"]
+        or constraints["exclude_tags"]
+        or constraints["max_calories"] is not None
+        or constraints["prefer_tags"]
+    )
+
+
+def _parse_calories(nutrition_str: str) -> Optional[float]:
+    """解析 metadata 中的营养字段（dict 的 str 形式），失败返回 None（该条不参与热量过滤）"""
+    try:
+        data = ast.literal_eval(nutrition_str)
+        return float(data["calories"])
+    except (ValueError, SyntaxError, KeyError, TypeError):
+        return None
+
+
+def apply_constraints(candidates: List[Dict], constraints: Dict) -> List[Dict]:
+    """对召回候选做硬过滤：排除食材/标签、热量上限。过滤为空属预期（走未找到链路）。"""
+    filtered = []
+    for c in candidates:
+        name_ing = c.get("name", "") + " " + c.get("ingredients", "")
+        tags = c.get("tags", "")
+        if any(kw in name_ing for kw in constraints["exclude_ingredients"]):
+            continue
+        if any(kw in tags for kw in constraints["exclude_tags"]):
+            continue
+        if constraints["max_calories"] is not None:
+            cal = _parse_calories(c.get("nutrition", ""))
+            if cal is not None and cal > constraints["max_calories"]:
+                continue
+        filtered.append(c)
+    return filtered
+
+
+def apply_prefer_nudge(reranked: List[Dict], prefer_tags: List[str]) -> None:
+    """按偏好标签命中数对 rerank 分做有界微调（in-place 重排），仅用于同分区分"""
+    if not prefer_tags or not reranked:
+        return
+    for recipe in reranked:
+        text = recipe.get("name", "") + " " + recipe.get("tags", "")
+        hits = sum(1 for t in prefer_tags if t in text)
+        base = recipe.get("rerank_score", 0) or 0
+        recipe["rerank_score"] = round(base + hits * _PREFER_WEIGHT, 4)
+    reranked.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
+
+
 # ========== Stage 3: Rerank 重排 ==========
 
 def rule_based_rerank(query_info: Dict, candidates: List[Dict], top_n: int = 5) -> List[Dict]:
@@ -282,7 +454,10 @@ def rag_search(user_query: str, top_k: int = RAG_TOP_K, top_n: int = RAG_TOP_N) 
     Pipeline:
     1. Query 改写 → LLM 将口语化 query 改写为检索关键词
     2. 向量召回 → ChromaDB 语义搜索 Top-K（失败降级关键字匹配）
+    2.5. 约束硬过滤 → 规则抽取否定/饮食约束，过滤候选（过滤为空返回未找到）
     3. Rerank 重排 → DashScope gte-rerank 重排（失败降级规则打分）
+    3.5. 阈值拒答 → top1 rerank 分低于阈值返回空（触发"未找到"链路）
+    3.6. 偏好微调 → 命中偏好标签的结果同分小幅上浮
     4. 返回 Top-N 结果 + 全链路执行日志
 
     Returns:
@@ -301,14 +476,32 @@ def rag_search(user_query: str, top_k: int = RAG_TOP_K, top_n: int = RAG_TOP_N) 
     query_info = rewrite_query(user_query)
     pipeline_log.append(f"  → 改写结果: '{query_info['rewritten']}'")
 
+    # ===== Stage 1.5: 约束抽取（必须先于召回）=====
+    # 否定词会把向量召回带偏（query 提"猪肉"就召回一堆猪肉菜），
+    # 因此有硬约束时：1) 扩大召回池，让过滤在全库范围生效；
+    # 2) 召回与 rerank 打分改用剔除否定短语的净化 query
+    constraints = extract_constraints(user_query)
+    has_hard_constraints = bool(
+        constraints["exclude_ingredients"]
+        or constraints["exclude_tags"]
+        or constraints["max_calories"] is not None
+    )
+    recall_k = max(top_k, 50) if _constraints_active(constraints) else top_k
+    # 有约束时：召回/打分用净化 query（否定词对 embedding/rerank 只有污染）；
+    # 无约束时：召回用 LLM 改写结果、rerank 用原始 query（沿用原有行为）
+    scoring_query = sanitize_query(user_query) if _constraints_active(constraints) else user_query
+    recall_text = scoring_query if _constraints_active(constraints) else query_info["rewritten"]
+    if scoring_query != user_query:
+        pipeline_log.append(f"  → 净化打分 query: '{scoring_query}'")
+
     # ===== Stage 2: 向量召回 =====
-    pipeline_log.append(f"Stage 2: 向量召回 (top_k={top_k})...")
-    candidates = vector_recall(query_info["rewritten"], top_k=top_k)
+    pipeline_log.append(f"Stage 2: 向量召回 (top_k={recall_k})...")
+    candidates = vector_recall(recall_text, top_k=recall_k)
 
     if not candidates:
         pipeline_log.append("  ⚠️ 向量召回失败，降级为关键字匹配")
         fallback_used = True
-        candidates = keyword_recall(query_info["keywords"], top_k=top_k)
+        candidates = keyword_recall(query_info["keywords"], top_k=recall_k)
     else:
         pipeline_log.append(f"  → 召回 {len(candidates)} 条候选")
 
@@ -321,10 +514,33 @@ def rag_search(user_query: str, top_k: int = RAG_TOP_K, top_n: int = RAG_TOP_N) 
             "fallback_used": fallback_used,
         }
 
+    # ===== Stage 2.5: 约束硬过滤（否定/饮食约束，向量无法表达，规则抽取后过滤）=====
+    # 过滤后候选全量送 rerank，不提前截断 top_k：目标菜向量序可能排在 11~50 位
+    if has_hard_constraints:
+        before = len(candidates)
+        candidates = apply_constraints(candidates, constraints)
+        pipeline_log.append(
+            f"Stage 2.5: 约束硬过滤（排除食材{constraints['exclude_ingredients']} "
+            f"排除标签{constraints['exclude_tags']} 热量上限{constraints['max_calories']}）"
+            f"→ {before} 条剩 {len(candidates)} 条"
+        )
+        if not candidates:
+            pipeline_log.append("  ❌ 约束过滤后无候选，按未找到处理")
+            logger.info(f"[RAG] 约束过滤后无候选 | Query: '{user_query}'")
+            return {
+                "query_info": query_info,
+                "results": [],
+                "pipeline_log": pipeline_log,
+                "fallback_used": fallback_used,
+            }
+
     # ===== Stage 3: Rerank 重排 =====
-    pipeline_log.append(f"Stage 3: Rerank 重排 (top_n={top_n})...")
+    # 有偏好标签时取全量重排，让偏好微调能把 top_n 之外的目标菜浮上来，再截断
+    rerank_top_n = len(candidates) if constraints["prefer_tags"] else top_n
+    pipeline_log.append(f"Stage 3: Rerank 重排 (top_n={rerank_top_n})...")
+    rerank_fellback = True  # 默认按降级处理，仅 DashScope 真实返回后置 False
     try:
-        reranked, rerank_fellback = dashscope_rerank(user_query, candidates, top_n=top_n)
+        reranked, rerank_fellback = dashscope_rerank(scoring_query, candidates, top_n=rerank_top_n)
         if rerank_fellback:
             pipeline_log.append("  ⚠️ Rerank 不可用，降级为规则打分")
             fallback_used = True
@@ -332,8 +548,31 @@ def rag_search(user_query: str, top_k: int = RAG_TOP_K, top_n: int = RAG_TOP_N) 
     except Exception as e:
         pipeline_log.append(f"  ⚠️ Rerank 失败，降级规则打分: {e}")
         fallback_used = True
-        reranked = rule_based_rerank(query_info, candidates, top_n=top_n)
+        reranked = rule_based_rerank(query_info, candidates, top_n=rerank_top_n)
         pipeline_log.append(f"  → 规则打分完成，返回 {len(reranked)} 条")
+
+    # ===== Stage 3.5: 偏好标签同分微调（先于阈值判定，让命中偏好的边界正例有机会过阈）=====
+    if constraints["prefer_tags"]:
+        apply_prefer_nudge(reranked, constraints["prefer_tags"])
+        reranked = reranked[:top_n]
+        pipeline_log.append(f"Stage 3.5: 偏好微调 {constraints['prefer_tags']}")
+
+    # ===== Stage 3.6: 相关性阈值拒答（仅 DashScope 分数可跨 query 比较，规则分不适用）=====
+    # 评测依据：负例 top1 rerank 分全部 ≤0.179，正例最低 0.173，阈值 0.16 可拦截 9/10 负例
+    # 硬约束查询豁免：幸存者已被规则过滤保证约束合规，低 rerank 分多因净化后 query 较短，不应拒答
+    if not rerank_fellback and reranked and not has_hard_constraints:
+        top1_score = reranked[0].get("rerank_score", 0)
+        if top1_score < RAG_RERANK_THRESHOLD:
+            pipeline_log.append(
+                f"Stage 3.6: top1 相关性 {top1_score} < 阈值 {RAG_RERANK_THRESHOLD}，判定知识库无相关菜谱"
+            )
+            logger.info(f"[RAG] 阈值拒答 | Query: '{user_query}' | top1 rerank 分: {top1_score}")
+            return {
+                "query_info": query_info,
+                "results": [],
+                "pipeline_log": pipeline_log,
+                "fallback_used": fallback_used,
+            }
 
     logger.info(f"[RAG] Pipeline 完成 | Query: '{user_query}' | 结果: {len(reranked)} 条 | Fallback: {fallback_used}")
     return {

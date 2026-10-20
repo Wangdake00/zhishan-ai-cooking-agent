@@ -1,0 +1,50 @@
+{"id": "case_01", "query": "宫保鸡丁怎么做？", "category": "exact_name", "relevant_ids": ["r003"], "notes": "标准菜名直查基线用例；r003 宫保鸡丁"}
+{"id": "case_02", "query": "红烧肉的做法", "category": "exact_name", "relevant_ids": ["r021", "r069"], "notes": "r021 家常红烧肉为主目标；r069 毛氏红烧肉是可接受的变体，一并计入相关"}
+{"id": "case_03", "query": "番茄炒鸡蛋怎么做？", "category": "synonym", "relevant_ids": ["r019"], "notes": "番茄=西红柿同义词改写；手动探针基线 rank1≈0.88；r042 番茄蛋花汤/r040 番茄龙利鱼是不同菜品不算相关"}
+{"id": "case_04", "query": "马铃薯炖牛肉怎么炖才烂？", "category": "synonym", "relevant_ids": ["r023"], "notes": "马铃薯=土豆；手动探针基线 rank1≈0.82 但 rerank 后 top1 relevance_score 仅 0.19 且 2-5 名有噪声，是复现 rerank 噪声的关键用例"}
+{"id": "case_05", "query": "牛肉炖土豆怎么做好吃", "category": "word_order", "relevant_ids": ["r023"], "notes": "词序颠倒（土豆炖牛肉→牛肉炖土豆），考验 embedding 对中文语序的鲁棒性"}
+{"id": "case_06", "query": "家里有番茄和龙利鱼，能做什么菜？", "category": "ingredient_combo", "relevant_ids": ["r040"], "notes": "给食材问做法；r040 番茄龙利鱼食材同时含龙利鱼200g和番茄2个，是唯一双食材匹配项"}
+{"id": "case_07", "query": "今天好热没胃口，想吃点清爽开胃的凉菜", "category": "scenario", "relevant_ids": ["r026", "r038", "r091", "r094", "r095", "r096"], "notes": "场景口味类；知识库中 tags 含'凉菜'且口味清淡/开胃的 6 道；麻辣重口凉菜(r007 夫妻肺片/r008 蒜泥白肉/r093 口水鸡)和卤味(r062 盐水鸭)不符合'清爽'不计入"}
+{"id": "case_08", "query": "我在减脂期，想吃高蛋白低脂的鸡肉类菜", "category": "constraint", "relevant_ids": ["r034", "r035", "r089", "r092"], "notes": "饮食约束类；4 道鸡胸肉菜均带'减脂+低卡+高蛋白+鸡胸肉'标签；非鸡肉减脂菜(r036 藜麦碗/r090 虾仁西兰花)不计入"}
+{"id": "case_09", "query": "佛跳墙怎么做？", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库 100 道菜无佛跳墙，观察无约束时的误召回程度"}
+{"id": "case_10", "query": "北京烤鸭怎么做好吃？", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库无北京烤鸭，但存在鸭类近邻(r062 盐水鸭/r084 啤酒鸭/r045 老鸭汤)，适合观察语义漂移型误召回"}
+{"id": "case_11", "query": "青瓜怎么拌好吃？", "category": "synonym", "relevant_ids": ["r038"], "notes": "青瓜=黄瓜地域别名；r038 凉拌黄瓜"}
+{"id": "case_12", "query": "花菜怎么做才入味？", "category": "synonym", "relevant_ids": ["r080"], "notes": "花菜=菜花同义；r080 干煸花菜"}
+{"id": "case_13", "query": "想吃咕咾肉怎么做？", "category": "synonym", "relevant_ids": ["r018"], "notes": "咕咾肉=咕噜肉音译别名；r018 菠萝咕噜肉"}
+{"id": "case_14", "query": "大虾怎么做才好吃？", "category": "synonym", "relevant_ids": ["r055"], "notes": "大虾=虾口语化叫法；r055 油焖大虾（r096 白灼虾是不同做法，不算同义）"}
+{"id": "case_15", "query": "肉丝炒青椒的做法", "category": "word_order", "relevant_ids": ["r022"], "notes": "词序颠倒：青椒肉丝→肉丝炒青椒；r022"}
+{"id": "case_16", "query": "粉条炖猪肉的做法", "category": "word_order", "relevant_ids": ["r075"], "notes": "词序颠倒：猪肉炖粉条→粉条炖猪肉；r075"}
+{"id": "case_17", "query": "蘑菇炖小鸡怎么做？", "category": "word_order", "relevant_ids": ["r074"], "notes": "词序颠倒：小鸡炖蘑菇→蘑菇炖小鸡；r074"}
+{"id": "case_18", "query": "家里有豆腐和牛肉末，想做个菜", "category": "ingredient_combo", "relevant_ids": ["r001"], "notes": "双食材匹配；r001 麻婆豆腐（嫩豆腐1块+牛肉末100g）"}
+{"id": "case_19", "query": "想吃点西芹和虾仁一起做的菜", "category": "ingredient_combo", "relevant_ids": ["r083"], "notes": "双食材匹配；r083 西芹百合炒虾仁（鲜虾仁200g+西芹2根）"}
+{"id": "case_20", "query": "想做个有粉丝和肉末的菜", "category": "ingredient_combo", "relevant_ids": ["r010"], "notes": "双食材匹配；r010 蚂蚁上树（粉丝2把+肉末100g）"}
+{"id": "case_21", "query": "早上想吃点营养的早餐，推荐一下", "category": "scenario", "relevant_ids": ["r039", "r041", "r097", "r098", "r100"], "notes": "早餐场景；tags 含'早餐'的 7 道中选 5 道最具代表性的"}
+{"id": "case_22", "query": "今晚家里来客人，想做几道拿得出手的硬菜", "category": "scenario", "relevant_ids": ["r021", "r053", "r055", "r060", "r064"], "notes": "宴客硬菜场景；tags 含'宴客'的 20+ 道中精选 5 道最具代表性的经典硬菜"}
+{"id": "case_23", "query": "孩子不爱吃辣，想吃甜甜酸酸的菜", "category": "scenario", "relevant_ids": ["r018", "r020", "r024", "r053"], "notes": "儿童酸甜口味场景；tags 含'酸甜'且不含'辣'的 4 道"}
+{"id": "case_24", "query": "加班到很晚，想做个快手宵夜，不要辣的", "category": "scenario", "relevant_ids": ["r028", "r032", "r038", "r042", "r043"], "notes": "快手宵夜场景；tags 含'快手菜'且不含'辣'的清淡菜 5 道"}
+{"id": "case_25", "query": "家里老人牙口不好，想吃软烂易消化的菜", "category": "scenario", "relevant_ids": ["r017", "r023", "r044", "r045", "r061"], "notes": "老人软烂场景；炖菜/汤类 5 道（软烂易消化）"}
+{"id": "case_26", "query": "冬天想吃点热乎乎的炖菜暖暖身子", "category": "scenario", "relevant_ids": ["r045", "r074", "r075", "r076", "r078"], "notes": "冬季暖身场景；tags 含'冬季'或'炖菜'的 5 道"}
+{"id": "case_27", "query": "朋友聚会想吃麻辣刺激的川菜", "category": "scenario", "relevant_ids": ["r001", "r004", "r006", "r007"], "notes": "麻辣川菜聚会场景；川菜+麻辣标签 4 道（夫妻肺片、口水鸡等凉菜也麻辣但宴客场景不同）"}
+{"id": "case_28", "query": "想做个简单清淡的蒸菜，健康点的", "category": "scenario", "relevant_ids": ["r012", "r013", "r037", "r087", "r089"], "notes": "清淡蒸菜场景；tags 含'蒸菜'的 5 道"}
+{"id": "case_29", "query": "周末想做点仪式感强的经典名菜", "category": "scenario", "relevant_ids": ["r003", "r053", "r056", "r057", "r060"], "notes": "经典名菜仪式感场景；tags 含'经典名菜'/'传统名菜'的 5 道代表性硬菜"}
+{"id": "case_30", "query": "心情不好想吃重口味的下饭菜", "category": "scenario", "relevant_ids": ["r002", "r005", "r006", "r068", "r072"], "notes": "重口下饭场景；tags 含'下饭'且偏香辣重口的 5 道"}
+{"id": "case_31", "query": "一个人住，想做一锅出的简单饭菜", "category": "scenario", "relevant_ids": ["r016", "r076", "r088"], "notes": "一人食一锅出场景；tags 含'一锅出'的 3 道"}
+{"id": "case_32", "query": "正在减脂，想要低卡又可以当主食的菜", "category": "constraint", "relevant_ids": ["r036", "r039", "r041"], "notes": "减脂主食约束；tags 含'减脂'且可当主食的 3 道"}
+{"id": "case_33", "query": "纯素食，不要任何肉蛋，推荐几道", "category": "constraint", "relevant_ids": ["r025", "r026", "r027", "r031", "r038"], "notes": "纯素食约束；tags 含'素菜'且食材无肉蛋的 5 道"}
+{"id": "case_34", "query": "口腔溃疡不能吃辣，推荐清淡不辣的菜", "category": "constraint", "relevant_ids": ["r011", "r013", "r017", "r026", "r031"], "notes": "无辣清淡约束；tags 含'清淡'且明确无辣标签的 5 道"}
+{"id": "case_35", "query": "增肌期想多吃高蛋白，不要鸡肉", "category": "constraint", "relevant_ids": ["r013", "r037", "r055", "r090", "r096"], "notes": "高蛋白非鸡肉约束；鱼虾海鲜类高蛋白 5 道"}
+{"id": "case_36", "query": "便秘想吃点高纤维的", "category": "constraint", "relevant_ids": ["r031", "r036", "r091"], "notes": "高纤维约束；tags 含'高纤维'的 3 道"}
+{"id": "case_37", "query": "体检血脂高，想吃低盐清淡的菜", "category": "constraint", "relevant_ids": ["r011", "r012", "r013", "r026", "r042"], "notes": "低盐清淡约束；蒸菜/白灼/汤类等少盐少油的 5 道"}
+{"id": "case_38", "query": "控糖期，想吃低碳水的菜", "category": "constraint", "relevant_ids": ["r035", "r037", "r038", "r089", "r090"], "notes": "低碳水控糖约束；几乎不含或极低碳水的 5 道（鸡胸肉/鱼/虾/蔬菜）"}
+{"id": "case_39", "query": "孕早期想吃酸的，不要油腻", "category": "constraint", "relevant_ids": ["r025", "r042", "r043", "r095"], "notes": "孕早期酸口不油腻约束；清淡汤类/凉菜中带酸味的 4 道"}
+{"id": "case_40", "query": "清真饮食，不能吃猪肉", "category": "constraint", "relevant_ids": ["r003", "r011", "r013", "r029", "r055"], "notes": "清真约束（无猪肉）；鸡肉/鱼/虾/羊肉类 5 道"}
+{"id": "case_41", "query": "明天要带饭去公司，推荐便携不容易变味的", "category": "constraint", "relevant_ids": ["r028", "r038", "r092", "r094"], "notes": "便携便当约束；凉拌菜/卷饼/炒饭等适合带饭的 4 道"}
+{"id": "case_42", "query": "胃不舒服，想吃软烂好消化的", "category": "constraint", "relevant_ids": ["r017", "r023", "r044", "r045", "r046"], "notes": "易消化软烂约束；汤类/炖菜/甜汤 5 道"}
+{"id": "case_43", "query": "法式鹅肝怎么做？", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库无西餐/法餐"}
+{"id": "case_44", "query": "冬阴功汤的做法", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库无泰餐"}
+{"id": "case_45", "query": "意大利肉酱面怎么做？", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库无西餐意面"}
+{"id": "case_46", "query": "日式寿喜烧的做法", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库无日料"}
+{"id": "case_47", "query": "想做蒜蓉粉丝蒸扇贝", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库有 r087 蒜蓉粉丝蒸娃娃菜但无扇贝（食材不同）"}
+{"id": "case_48", "query": "可乐排骨怎么做好吃？", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库有 r020 可乐鸡翅、r024 糖醋排骨，但无'可乐排骨'"}
+{"id": "case_49", "query": "想学做炸酱面", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库有 r047 葱油拌面、r049 红烧牛肉面，但无炸酱面"}
+{"id": "case_50", "query": "梅菜扣肉怎么做？", "category": "negative", "relevant_ids": [], "notes": "负样本：知识库有 r021 红烧肉、r069 毛氏红烧肉，但无梅菜扣肉"}
