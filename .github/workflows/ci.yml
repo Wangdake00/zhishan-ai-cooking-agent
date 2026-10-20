@@ -1,0 +1,54 @@
+# CI 冒烟测试：StateGraph 架构完整性验证（无需 LLM API Key）
+# 依赖 PostgreSQL 服务容器：test_quick 编译 StateGraph 时会初始化
+# AsyncPostgresSaver checkpointer，并查询 sessions 等业务表（需先跑 Alembic 迁移）
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: chief
+          POSTGRES_PASSWORD: chief123
+          POSTGRES_DB: ai_chef
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chief -d ai_chef"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: chief
+      POSTGRES_PASSWORD: chief123
+      POSTGRES_DB: ai_chef
+      DEBUG: "true"
+      JWT_SECRET_KEY: ci-test-secret-not-for-production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv + Python 3.13
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: 安装依赖（严格按 uv.lock）
+        run: uv sync --frozen
+
+      - name: 数据库迁移
+        run: uv run alembic upgrade head
+
+      - name: StateGraph 冒烟测试（无 LLM 调用）
+        run: uv run python tests/test_quick.py
