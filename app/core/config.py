@@ -41,6 +41,35 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 120
     llm_max_retries: int = 2
 
+    # ========== 长会话上下文治理 ==========
+    # 总开关：关闭后所有裁剪/摘要/图片治理均不生效（等同旧行为）
+    context_manage_enabled: bool = True
+    # 触发阈值：轮数或估算 token 先到先触发（双阈值）
+    context_max_turns: int = 10
+    context_max_tokens: int = 6000
+    # 裁剪窗口：保留首轮 + 最近 N 轮，中间段走摘要
+    context_keep_recent_turns: int = 8
+    context_keep_first_turn: bool = True
+    # 摘要：同步增量摘要（只压缩新增的旧轮次），失败降级为不裁剪
+    context_summary_enabled: bool = True
+    context_summary_max_chars: int = 600
+    context_summary_input_max_chars: int = 8000
+    context_summary_timeout_seconds: int = 20
+    # 硬上限：摘要连续失败时仍超限，则退化为无摘要滑动窗口（保证不撑爆上下文）
+    context_hard_limit_tokens: int = 20000
+    # 历史图片治理：历史轮次图片替换为占位文本，仅保留最近 N 张历史图 + 当前轮图片
+    context_image_govern_enabled: bool = True
+    context_image_keep_recent: int = 1
+    # 图片持久化方式：oss_key（默认，落对象键，读取时重签 URL）| base64（旧行为）
+    context_image_persist: str = "oss_key"
+    # token 粗估系数（不引入 tokenizer 依赖）
+    context_token_chars_per_token_zh: float = 1.3
+    context_token_chars_per_token_other: float = 4.0
+    context_image_token_estimate: int = 1280
+    # 跨会话长期偏好记忆
+    preference_memory_enabled: bool = True
+    preference_max_items: int = 20
+
     # ========== RAG / ChromaDB 向量检索 ==========
     chroma_db_dir: str = "db/chroma_data"
     chroma_collection_name: str = "recipes"

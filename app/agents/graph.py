@@ -34,6 +34,8 @@ from app.core.exceptions import RAGException
 from app.db import session_store, favorite_store
 from app.rag.pipeline import rag_search
 from app.agents.utils import ensure_image_base64_data_url
+from app.agents.context import build_llm_messages
+from app.common import oss
 from app.agents.grounding import (
     extract_nutrition_facts,
     extract_recipe_facts,
@@ -548,14 +550,20 @@ def detect_intent(state: AgentState) -> dict:
     recipe_kw = ["做什么菜", "菜谱", "推荐菜", "能做", "怎么做", "做什么", "食谱",
                  "烧什么", "炒什么", "炖什么", "做法", "烹饪", "搭配", "菜谱推荐"]
 
-    for kw in nutrition_kw:
-        if kw in user_input:
-            logger.info(f"[detect_intent] → nutrition (匹配关键词: {kw})")
-            return {"intent": "nutrition"}
-    for kw in recipe_kw:
-        if kw in user_input:
-            logger.info(f"[detect_intent] → recipe (匹配关键词: {kw})")
-            return {"intent": "recipe"}
+    nutrition_hit = next((kw for kw in nutrition_kw if kw in user_input), None)
+    recipe_hit = next((kw for kw in recipe_kw if kw in user_input), None)
+
+    # 双命中视为复合意图 → 通用路（全工具自主规划 + 双事实提取器后置校验），
+    # 避免单标签路由把复合问题压扁、专路 prompt 人格偏向导致另一半回答敷衍
+    if nutrition_hit and recipe_hit:
+        logger.info(f"[detect_intent] → general (双命中复合意图: 营养[{nutrition_hit}] + 菜谱[{recipe_hit}])")
+        return {"intent": "general"}
+    if nutrition_hit:
+        logger.info(f"[detect_intent] → nutrition (匹配关键词: {nutrition_hit})")
+        return {"intent": "nutrition"}
+    if recipe_hit:
+        logger.info(f"[detect_intent] → recipe (匹配关键词: {recipe_hit})")
+        return {"intent": "recipe"}
 
     logger.info(f"[detect_intent] → general (默认，未匹配营养/菜谱关键词)")
     return {"intent": "general"}
@@ -700,7 +708,7 @@ async def nutrition_node(state: AgentState) -> dict:
     logger.debug(f"[nutrition_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[nutrition_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
-    messages = [system] + state_messages
+    messages = await build_llm_messages(system, state_messages, node="nutrition")
     logger.debug(f"[nutrition_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
@@ -731,7 +739,7 @@ async def recipe_node(state: AgentState) -> dict:
     logger.debug(f"[recipe_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[recipe_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
-    messages = [system] + state_messages
+    messages = await build_llm_messages(system, state_messages, node="recipe")
     logger.debug(f"[recipe_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
@@ -762,7 +770,7 @@ async def general_node(state: AgentState) -> dict:
     logger.debug(f"[general_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[general_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
-    messages = [system] + state_messages
+    messages = await build_llm_messages(system, state_messages, node="general")
     logger.debug(f"[general_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
@@ -879,6 +887,31 @@ async def _ground_and_verify(
             yield card
 
 
+async def _build_image_block(img_url: str, user_id: int, thread_id: str) -> dict:
+    """
+    把本轮图片转成可持久化的内容块（只落对象键，避免 base64 常驻 checkpoint）
+
+    - 前端已上传到本 bucket 的 URL：直接提取对象键，无需下载/转存
+    - 其他来源：下载转 base64 后转存 OSS，返回对象键
+    - OSS 未配置或转存失败：降级为旧行为（持久化 base64 data URL）
+    """
+    if settings.context_image_persist == "oss_key" and oss.is_configured():
+        object_key = oss.extract_object_key(img_url)
+        if object_key:
+            return {"type": "image_ref", "key": object_key}
+        try:
+            data_url = await ensure_image_base64_data_url(img_url)
+            object_key = await oss.upload_data_url(
+                data_url, oss.build_image_object_key(user_id, thread_id, data_url)
+            )
+            return {"type": "image_ref", "key": object_key}
+        except Exception as e:
+            logger.warning(f"[ImageGovern] 图片转存 OSS 失败，降级持久化 base64: {type(e).__name__}: {e}")
+
+    data_url = await ensure_image_base64_data_url(img_url)
+    return {"type": "image_url", "image_url": {"url": data_url}}
+
+
 async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: int):
     """
     基于 StateGraph 的流式对话
@@ -902,12 +935,12 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
         if image_urls:
             for img_url in image_urls:
                 if img_url and img_url.strip():
-                    img_data_url = await ensure_image_base64_data_url(img_url)
-                    content_blocks.append({
-                        "type": "image_url",
-                        "image_url": {"url": img_data_url},
-                    })
-            logger.info(f"[stream_chat] 图片处理完成: 共 {len([b for b in content_blocks if b.get('type') == 'image_url'])} 张 base64 data URL")
+                    content_blocks.append(await _build_image_block(img_url, user_id, thread_id))
+            ref_count = sum(1 for b in content_blocks if b.get("type") == "image_ref")
+            logger.info(
+                f"[stream_chat] 图片处理完成: 共 {len(content_blocks)} 张"
+                f"（对象键 {ref_count} 张，base64 降级 {len(content_blocks) - ref_count} 张）"
+            )
 
         if not prompt or prompt.strip() == "":
             if image_urls:
@@ -1019,6 +1052,35 @@ async def delete_session(thread_id: str, user_id: int):
     await session_store.delete_session(thread_id, user_id)
 
 
+async def _render_history_content(content):
+    """
+    把持久化内容块渲染成前端可消费格式：
+    - image_ref（仅存对象键）→ image_url + 重新签发的 7 天 GET URL
+    - 重签失败降级为占位文本，不阻断历史加载
+    - 其他块原样透传（兼容旧版 base64 image_url）
+    """
+    if not isinstance(content, list):
+        return content
+
+    rendered = []
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "image_ref":
+            key = block.get("key")
+            url = ""
+            if key:
+                try:
+                    url = await oss.presign_get(key)
+                except Exception as e:
+                    logger.warning(f"[ImageGovern] 历史图片重签失败（降级为占位）: {type(e).__name__}: {e}")
+            if url:
+                rendered.append({"type": "image_url", "image_url": {"url": url}})
+            else:
+                rendered.append({"type": "text", "text": "[图片已过期]"})
+            continue
+        rendered.append(block)
+    return rendered
+
+
 async def get_messages(thread_id: str) -> list:
     """获取会话历史消息
     
@@ -1051,7 +1113,7 @@ async def get_messages(thread_id: str) -> list:
         role = "user" if isinstance(msg, HumanMessage) else "assistant" if isinstance(msg, AIMessage) else None
         if role is None:
             continue
-        result.append({"role": role, "content": content})
+        result.append({"role": role, "content": await _render_history_content(content)})
 
     logger.info(f"[get_messages] 返回 {len(result)} 条历史消息, thread_id={thread_id}")
     return result
