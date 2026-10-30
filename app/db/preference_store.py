@@ -4,6 +4,8 @@
 承载跨会话记忆：忌口、过敏、饮食目标等稳定约束。
 由 stream_chat 在检测到显式触发词时抽取并 upsert，图节点每轮读取拼进 system prompt。
 """
+from datetime import timezone
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -63,8 +65,9 @@ async def list_preferences(user_id: int, limit: int = 100) -> list[dict]:
                 "category": row.category,
                 "content": row.content,
                 "source": row.source,
-                "created_at": row.created_at.isoformat() if row.created_at else "",
-                "updated_at": row.updated_at.isoformat() if row.updated_at else "",
+                # DB 中为不带时区的 UTC 时间，补上 UTC 标记，避免前端按本地时间解析
+                "created_at": row.created_at.replace(tzinfo=timezone.utc).isoformat(timespec="seconds"),
+                "updated_at": row.updated_at.replace(tzinfo=timezone.utc).isoformat(timespec="seconds"),
             }
             for row in rows
         ]
