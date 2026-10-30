@@ -39,6 +39,16 @@ export interface Favorite {
   updated_at: string;
 }
 
+// 跨会话饮食偏好
+export interface Preference {
+  id: number;
+  category: string;
+  content: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Recipe {
   title: string;
   score?: number;

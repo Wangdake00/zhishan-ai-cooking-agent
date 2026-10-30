@@ -13,6 +13,7 @@ from app.agents.personal_chief import (
     clear_messages,
     list_sessions,
     delete_session,
+    prepare_preferences,
 )
 
 
@@ -26,9 +27,18 @@ async def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_c
     session = await session_store.get_session(request.thread_id)
     if session is not None and session["user_id"] != current_user["id"]:
         raise PermissionDeniedException("无权操作此会话")
+    # 偏好抽取前移到流开始前，便于用响应头告知前端本轮新增条数
+    preferences, added_count = await prepare_preferences(request.message, current_user["id"])
     return StreamingResponse(
-        search_recipes(request.message, request.image_urls or [], request.thread_id, current_user["id"]),
-        media_type="text/event-stream"
+        search_recipes(
+            request.message,
+            request.image_urls or [],
+            request.thread_id,
+            current_user["id"],
+            preferences,
+        ),
+        media_type="text/event-stream",
+        headers={"X-Preference-Added": str(added_count)} if added_count else None,
     )
 
 

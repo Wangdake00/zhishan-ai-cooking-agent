@@ -7,6 +7,7 @@ from app.api.v1 import chat
 from app.api.v1 import oss
 from app.api.v1 import auth
 from app.api.v1 import favorites
+from app.api.v1 import preferences
 from app.api.v1 import voice
 from app.common.logger import setup_logging
 from app.core.config import settings
@@ -36,6 +37,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # 允许前端读取偏好新增条数响应头（跨域默认只暴露简单响应头）
+    expose_headers=["X-Preference-Added"],
 )
 
 # 2.挂载路由
@@ -43,6 +46,7 @@ app.include_router(auth.router, prefix="/api/v1", tags=["用户认证"])
 app.include_router(chat.router, prefix="/api/v1", tags=["对话"])
 app.include_router(oss.router, prefix="/api/v1", tags=["申请上传签名url"])
 app.include_router(favorites.router, prefix="/api/v1", tags=["收藏食谱"])
+app.include_router(preferences.router, prefix="/api/v1", tags=["饮食偏好"])
 app.include_router(voice.router, prefix="/api/v1", tags=["语音识别"])
 
 # 3.健康检查端点

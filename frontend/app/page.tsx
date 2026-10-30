@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Message, Session, Favorite } from "@/types/chat";
+import { Message, Session, Favorite, Preference } from "@/types/chat";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
-import { uploadImageToOss, streamChat, getChatHistory, listSessions, deleteSession, listFavorites, deleteFavorite } from "@/lib/api";
+import { uploadImageToOss, streamChat, getChatHistory, listSessions, deleteSession, listFavorites, deleteFavorite, listPreferences, deletePreference } from "@/lib/api";
 import { generateUUID } from "@/lib/utils";
 import { getUser, clearAuth } from "@/lib/auth";
 import type { User } from "@/lib/auth";
@@ -26,7 +26,17 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-type SidebarTab = "sessions" | "favorites";
+type SidebarTab = "sessions" | "favorites" | "preferences";
+
+// 偏好类别展示顺序与配色（与后端抽取的 category 对齐）
+const PREFERENCE_ORDER = ["过敏", "忌口", "目标", "偏好", "其他"];
+const PREFERENCE_STYLES: Record<string, string> = {
+    过敏: "bg-red-50 text-red-600 border-red-100",
+    忌口: "bg-orange-50 text-orange-700 border-orange-100",
+    目标: "bg-green-50 text-green-700 border-green-100",
+    偏好: "bg-blue-50 text-blue-700 border-blue-100",
+    其他: "bg-gray-50 text-gray-600 border-gray-100",
+};
 
 // React 19 purity lint 规则误判 Date.now() 为「render 中调用不纯函数」，这里包一层 helper 放顶层避开
 const getTimestamp = () => Date.now();
@@ -40,6 +50,10 @@ export default function Home() {
     const [threadId, setThreadId] = useState<string>("");
     const [sessions, setSessions] = useState<Session[]>([]);
     const [favorites, setFavorites] = useState<Favorite[]>([]);
+    const [preferences, setPreferences] = useState<Preference[]>([]);
+    // 本轮新增偏好提示（由 /chat/stream 的 X-Preference-Added 响应头触发）
+    const [preferenceHint, setPreferenceHint] = useState<number | null>(null);
+    const preferenceHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     // user 同上：SSR 时返回 null，客户端 mount 后再读 localStorage 同步
     const [user, setUser] = useState<User | null>(null);
     const [authChecked, setAuthChecked] = useState(false);
@@ -141,6 +155,38 @@ export default function Home() {
         }
     };
 
+    // 刷新饮食偏好列表
+    const refreshPreferences = async () => {
+        try {
+            const list = await listPreferences();
+            setPreferences(list);
+        } catch (error) {
+            console.error("获取饮食偏好失败:", error);
+        }
+    };
+
+    // 删除一条饮食偏好
+    const handleDeletePreference = async (preferenceId: number, e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        const confirmDelete = window.confirm("确定要删除这条饮食偏好吗？删除后 AI 将不再记住它。");
+        if (!confirmDelete) return;
+        try {
+            await deletePreference(preferenceId);
+            setPreferences((prev) => prev.filter((p) => p.id !== preferenceId));
+        } catch (error) {
+            console.error("删除饮食偏好失败:", error);
+            alert("删除饮食偏好失败");
+        }
+    };
+
+    // 打开偏好面板（供对话内提示跳转）
+    const handleOpenPreferences = () => {
+        setSelectedFavorite(null);
+        setSidebarTab("preferences");
+        setSidebarOpen(true);
+        setPreferenceHint(null);
+    };
+
     // 切换到指定会话
     const handleSelectSession = async (id: string) => {
         if (id === threadId) return;
@@ -220,6 +266,7 @@ export default function Home() {
         loadHistory(storedThreadId);
         refreshSessions();
         refreshFavorites();
+        refreshPreferences();
         setAuthChecked(true);
         /* eslint-enable react-hooks/set-state-in-effect */
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,7 +285,14 @@ export default function Home() {
     // 滚动到底部
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, selectedFavorite]);
+    }, [messages, selectedFavorite, preferenceHint]);
+
+    // 卸载时清理偏好提示定时器
+    useEffect(() => {
+        return () => {
+            if (preferenceHintTimer.current) clearTimeout(preferenceHintTimer.current);
+        };
+    }, []);
 
     // 添加消息
     const addMessage = (message: Omit<Message, "id" | "timestamp">) => {
@@ -329,7 +383,14 @@ export default function Home() {
                     refreshSessions();
                     setTimeout(refreshFavorites, 300);
                 },
-                threadId
+                threadId,
+                (count) => {
+                    // 本轮新增偏好：刷新列表 + 在对话区提示 5 秒
+                    setPreferenceHint(count);
+                    refreshPreferences();
+                    if (preferenceHintTimer.current) clearTimeout(preferenceHintTimer.current);
+                    preferenceHintTimer.current = setTimeout(() => setPreferenceHint(null), 5000);
+                }
             );
         } finally {
             setProcessing(false);
@@ -389,23 +450,36 @@ export default function Home() {
                     <div className="flex bg-orange-50 rounded-xl p-1">
                         <button
                             onClick={() => setSidebarTab("sessions")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${sidebarTab === "sessions"
+                            title="历史会话"
+                            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${sidebarTab === "sessions"
                                 ? "bg-white text-orange-600 shadow-sm"
                                 : "text-gray-500 hover:text-gray-700"
                                 }`}
                         >
                             <MessageSquare size={15} />
-                            <span>历史会话</span>
+                            <span>会话</span>
                         </button>
                         <button
                             onClick={() => setSidebarTab("favorites")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${sidebarTab === "favorites"
+                            title="收藏食谱"
+                            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${sidebarTab === "favorites"
                                 ? "bg-white text-orange-600 shadow-sm"
                                 : "text-gray-500 hover:text-gray-700"
                                 }`}
                         >
                             <Heart size={15} />
-                            <span>收藏食谱</span>
+                            <span>收藏</span>
+                        </button>
+                        <button
+                            onClick={() => setSidebarTab("preferences")}
+                            title="饮食偏好"
+                            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${sidebarTab === "preferences"
+                                ? "bg-white text-orange-600 shadow-sm"
+                                : "text-gray-500 hover:text-gray-700"
+                                }`}
+                        >
+                            <UtensilsCrossed size={15} />
+                            <span>偏好</span>
                         </button>
                     </div>
                 </div>
@@ -461,7 +535,7 @@ export default function Home() {
                                 })
                             )}
                         </div>
-                    ) : (
+                    ) : sidebarTab === "favorites" ? (
                         // === 收藏食谱列表 ===
                         <div className="space-y-1">
                             {favorites.length === 0 ? (
@@ -505,6 +579,52 @@ export default function Home() {
                                         </div>
                                     );
                                 })
+                            )}
+                        </div>
+                    ) : (
+                        // === 饮食偏好列表 ===
+                        <div className="space-y-1">
+                            {preferences.length === 0 ? (
+                                <div className="text-center py-10 text-gray-400">
+                                    <Sparkles size={32} className="mx-auto mb-2 opacity-40" />
+                                    <p className="text-sm">还没有记住你的饮食习惯</p>
+                                    <p className="text-xs mt-1">试试说「记住，我对花生过敏」</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {[...preferences]
+                                        .sort(
+                                            (a, b) =>
+                                                (PREFERENCE_ORDER.indexOf(a.category) + 1 || 99) -
+                                                (PREFERENCE_ORDER.indexOf(b.category) + 1 || 99)
+                                        )
+                                        .map((pref) => (
+                                            <div
+                                                key={pref.id}
+                                                className="group flex items-start gap-2 px-3 py-2.5 rounded-xl hover:bg-gray-50 border border-transparent transition-colors"
+                                            >
+                                                <span
+                                                    className={`mt-0.5 flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${PREFERENCE_STYLES[pref.category] || PREFERENCE_STYLES["其他"]}`}
+                                                >
+                                                    {pref.category}
+                                                </span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm text-gray-700 break-words">{pref.content}</p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">
+                                                        来自对话 · {formatTime(pref.updated_at || pref.created_at)}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => handleDeletePreference(pref.id, e)}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all rounded-md hover:bg-red-50"
+                                                    title="删除偏好"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    <p className="text-center text-xs text-gray-400 pt-2">仅你可见 · AI 会在每轮对话中遵守</p>
+                                </>
                             )}
                         </div>
                     )}
@@ -726,6 +846,17 @@ export default function Home() {
                                 {messages.map((message) => (
                                     <ChatMessage key={message.id} message={message} />
                                 ))}
+                                {preferenceHint !== null && (
+                                    <div className="flex">
+                                        <button
+                                            onClick={handleOpenPreferences}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 border border-orange-200 text-xs text-gray-600 hover:border-orange-300 hover:text-orange-600 shadow-sm transition-colors"
+                                        >
+                                            <Sparkles size={13} className="text-orange-500" />
+                                            <span>已记住 {preferenceHint} 条新偏好 · 查看</span>
+                                        </button>
+                                    </div>
+                                )}
                                 <div ref={messagesEndRef} />
                             </div>
                         )}

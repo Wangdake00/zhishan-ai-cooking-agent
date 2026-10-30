@@ -1,7 +1,7 @@
 /**
  * API 调用封装
  */
-import { Session, Favorite } from "@/types/chat";
+import { Session, Favorite, Preference } from "@/types/chat";
 import { getAuthHeaders } from "@/lib/auth";
 import type { User } from "@/lib/auth";
 
@@ -123,7 +123,8 @@ export async function streamChat(
     image_urls?: string[],
     onError?: (error: Error) => void,
     onComplete?: () => void,
-    threadId?: string
+    threadId?: string,
+    onPreferenceAdded?: (count: number) => void
 ): Promise<void> {
     try {
         const url = new URL(`${API_BASE}/api/v1/chat/stream`);
@@ -140,6 +141,12 @@ export async function streamChat(
 
         if (!response.ok) {
             throw new Error(response.status === 401 ? "登录已过期，请重新登录" : "请求失败");
+        }
+
+        // 后端在流开始前完成偏好抽取，用响应头回传本轮新增条数
+        const addedCount = Number(response.headers.get("X-Preference-Added") || 0);
+        if (addedCount > 0) {
+            onPreferenceAdded?.(addedCount);
         }
 
         const reader = response.body?.getReader();
@@ -280,6 +287,35 @@ export async function deleteFavorite(favoriteId: number): Promise<void> {
     });
     if (!response.ok) {
         throw new Error("删除收藏失败");
+    }
+}
+
+// ========== 饮食偏好相关 ==========
+
+/**
+ * 列出当前用户被记住的饮食偏好
+ */
+export async function listPreferences(): Promise<Preference[]> {
+    const response = await fetch(`${API_BASE}/api/v1/preferences`, {
+        headers: withAuth(),
+    });
+    if (!response.ok) {
+        throw new Error("获取饮食偏好失败");
+    }
+    const data = await response.json();
+    return data.preferences;
+}
+
+/**
+ * 删除一条饮食偏好
+ */
+export async function deletePreference(preferenceId: number): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/v1/preferences/${preferenceId}`, {
+        method: "DELETE",
+        headers: withAuth(),
+    });
+    if (!response.ok) {
+        throw new Error("删除饮食偏好失败");
     }
 }
 

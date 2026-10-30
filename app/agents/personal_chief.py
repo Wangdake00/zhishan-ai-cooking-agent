@@ -10,11 +10,18 @@ from app.agents.graph import (
     list_sessions,
     delete_session,
     get_messages,
+    prepare_turn_preferences,
 )
 
 # ========== 对外接口（直接引用 graph.py，保持 API 兼容） ==========
 
-async def search_recipes(prompt: str, image_urls: list, thread_id: str, user_id: int):
+async def search_recipes(
+    prompt: str,
+    image_urls: list,
+    thread_id: str,
+    user_id: int,
+    preferences: list | None = None,
+):
     """
     调用 StateGraph 搜索食谱 / 分析营养（流式输出）
 
@@ -23,9 +30,15 @@ async def search_recipes(prompt: str, image_urls: list, thread_id: str, user_id:
         image_urls: 图片 URL 列表（支持多张）
         thread_id: 会话 ID
         user_id: 用户 ID
+        preferences: 接口层预处理好的长期偏好（避免重复抽取）
     """
-    async for chunk in stream_chat(prompt, image_urls, thread_id, user_id):
+    async for chunk in stream_chat(prompt, image_urls, thread_id, user_id, preferences):
         yield chunk
+
+
+async def prepare_preferences(prompt: str, user_id: int) -> tuple[list, int]:
+    """预处理本轮长期偏好，返回 (注入用偏好列表, 新增条数)"""
+    return await prepare_turn_preferences(prompt, user_id)
 
 
 async def clear_messages(thread_id: str, user_id: int):

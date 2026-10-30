@@ -1038,7 +1038,45 @@ async def _build_image_block(img_url: str, user_id: int, thread_id: str) -> dict
     return {"type": "image_url", "image_url": {"url": data_url}}
 
 
-async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: int):
+async def prepare_turn_preferences(prompt: str, user_id: int) -> tuple[list, int]:
+    """
+    本轮开始前的长期偏好处理：命中显式触发词才抽取入库，再读取注入用偏好。
+
+    Returns:
+        (注入 system prompt 的偏好列表, 本轮新增条数)；任何异常均降级为 ([], 0)
+    """
+    if not settings.preference_memory_enabled:
+        return [], 0
+    try:
+        existing = await preference_store.list_preferences(user_id, settings.preference_max_items)
+        existing_contents = {item["content"] for item in existing}
+
+        added = 0
+        for item in await _extract_preferences(prompt):
+            content = (item.get("content") or "").strip()[:200]
+            if not content:
+                continue
+            await preference_store.upsert_preference(user_id, item["category"], content)
+            if content not in existing_contents:
+                existing_contents.add(content)
+                added += 1
+
+        preferences = await preference_store.get_preferences(user_id, settings.preference_max_items)
+        if preferences:
+            logger.info(f"[Preference] 本轮注入长期偏好 {len(preferences)} 条，新增 {added} 条")
+        return preferences, added
+    except Exception as e:
+        logger.warning(f"[Preference] 偏好记忆处理失败（已跳过）: {type(e).__name__}: {e}")
+        return [], 0
+
+
+async def stream_chat(
+    prompt: str,
+    image_urls: list,
+    thread_id: str,
+    user_id: int,
+    preferences: Optional[list] = None,
+):
     """
     基于 StateGraph 的流式对话
 
@@ -1047,6 +1085,7 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
         image_urls: 图片 URL 列表
         thread_id: 会话 ID
         user_id: 用户 ID
+        preferences: 已预处理好的长期偏好（由接口层传入以便回传新增条数；为空则本函数自行处理）
     """
     logger.info(f"[stream_chat] ========================================")
     logger.info(f"[stream_chat] 新请求: prompt='{prompt[:80]}', images={len(image_urls or [])}张, thread_id={thread_id}, user_id={user_id}")
@@ -1055,17 +1094,8 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
     await session_store.upsert_session(thread_id, user_id=user_id, title=(prompt or "上传了图片")[:30])
 
     # 跨会话长期偏好：命中显式触发词才单次抽取，读取失败静默跳过（不影响主回答）
-    preferences: list = []
-    if settings.preference_memory_enabled:
-        try:
-            extracted = await _extract_preferences(prompt)
-            for item in extracted:
-                await preference_store.upsert_preference(user_id, item["category"], item["content"])
-            preferences = await preference_store.get_preferences(user_id, settings.preference_max_items)
-            if preferences:
-                logger.info(f"[Preference] 本轮注入长期偏好 {len(preferences)} 条")
-        except Exception as e:
-            logger.warning(f"[Preference] 偏好记忆处理失败（已跳过）: {type(e).__name__}: {e}")
+    if preferences is None:
+        preferences, _ = await prepare_turn_preferences(prompt, user_id)
 
     try:
         graph = await get_graph()
