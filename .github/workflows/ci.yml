@@ -35,6 +35,8 @@ jobs:
       POSTGRES_DB: ai_chef
       DEBUG: "true"
       JWT_SECRET_KEY: ci-test-secret-not-for-production
+      # 冒烟测试不调用 LLM，但 graph.py 导入时会初始化客户端，需占位 Key 通过构造校验
+      DASHSCOPE_API_KEY: ci-dummy-key-no-llm-call
 
     steps:
       - uses: actions/checkout@v4
