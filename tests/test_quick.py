@@ -8,6 +8,7 @@
 """
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -37,6 +38,7 @@ RESET = "\033[0m"
 
 passed = 0
 failed = 0
+failed_checks: list[str] = []
 
 
 def check(name: str, condition: bool, detail: str = ""):
@@ -46,7 +48,12 @@ def check(name: str, condition: bool, detail: str = ""):
         print(f"  {GREEN}✓{RESET} {name}  {CYAN}{detail}{RESET}")
     else:
         failed += 1
+        item = f"{name} {detail}".strip()
+        failed_checks.append(item)
         print(f"  {RED}✗{RESET} {name}  {CYAN}{detail}{RESET}")
+        # CI 中把失败项写成注解，日志被截断时也能在 Run 页面看到具体原因
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            print(f"::error title=冒烟测试失败::{item}", flush=True)
 
 
 def section(title: str):
@@ -267,6 +274,7 @@ def main():
     global passed, failed
     passed = 0
     failed = 0
+    failed_checks.clear()
 
     print(f"\n{CYAN}{'#'*60}{RESET}")
     print(f"{CYAN}#  智膳 AI — StateGraph 快速验证（无 LLM 调用）{RESET}")
@@ -274,6 +282,8 @@ def main():
 
     if not test_imports():
         print(f"\n{RED}✗ 导入失败，后续测试跳过{RESET}")
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            print("::error title=冒烟测试失败::模块导入失败，详见上方输出", flush=True)
         sys.exit(1)
 
     test_state_graph_compile()
@@ -300,6 +310,14 @@ def main():
         print(f"     3. 运行 test_api.py 进行 API 集成测试")
     else:
         print(f"\n  {RED}⚠️  有 {failed} 项测试失败{RESET}")
+        for item in failed_checks:
+            print(f"    - {item}")
+        # GitHub Actions 日志可能被截断，同时写入步骤摘要
+        summary_path = os.getenv("GITHUB_STEP_SUMMARY")
+        if summary_path:
+            with open(summary_path, "a", encoding="utf-8") as f:
+                f.write("## 冒烟测试失败项\n\n")
+                f.writelines(f"- {item}\n" for item in failed_checks)
         sys.exit(1)
 
 
