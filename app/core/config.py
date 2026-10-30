@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     # ========== Agent 模型配置 ==========
-    llm_model: str = "qwen3.5-plus"
+    llm_model: str = "qwen3.8-flash"
     llm_timeout_seconds: int = 120
     llm_max_retries: int = 2
 
@@ -73,9 +73,9 @@ class Settings(BaseSettings):
     # ========== RAG / ChromaDB 向量检索 ==========
     chroma_db_dir: str = "db/chroma_data"
     chroma_collection_name: str = "recipes"
-    embedding_model: str = "text-embedding-v3"
+    embedding_model: str = "qwen3.7-text-embedding-flash"
     embedding_batch_size: int = 10
-    rerank_model: str = "gte-rerank"
+    rerank_model: str = "qwen3.7-text-rerank"
     rag_top_k: int = 10
     rag_top_n: int = 5
     # Rerank top1 相关性阈值：低于该分视为知识库无相关菜谱，走"未找到"链路
@@ -83,8 +83,8 @@ class Settings(BaseSettings):
     rag_rerank_threshold: float = 0.16
 
     # ========== 语音识别（STT） ==========
-    # DashScope Paraformer 实时语音识别模型
-    asr_model: str = "paraformer-realtime-v2"
+    # DashScope Qwen 实时语音识别模型
+    asr_model: str = "qwen-audio-3.1-asr-flash-streaming"
 
     # ========== Tavily（Agent 联网搜索工具） ==========
     tavily_api_key: str = ""

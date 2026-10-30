@@ -1,7 +1,7 @@
 """
 RAG 向量存储模块
 - 使用 ChromaDB 作为本地向量数据库
-- 使用 DashScope text-embedding-v3 作为 Embedding 模型（通过 OpenAI 兼容接口）
+- 使用 DashScope Embedding 模型（通过 OpenAI 兼容接口），模型可配置
 - 提供 100 条菜谱的向量化存储和语义检索能力
 - 所有模型名称/路径/参数均可通过 settings 配置
 """

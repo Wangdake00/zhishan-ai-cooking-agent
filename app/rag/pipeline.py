@@ -387,7 +387,7 @@ def rule_based_rerank(query_info: Dict, candidates: List[Dict], top_n: int = 5) 
 
 
 def dashscope_rerank(query: str, candidates: List[Dict], top_n: int = 5) -> tuple[List[Dict], bool]:
-    """使用 DashScope gte-rerank 模型重排（主方案）
+    """使用 DashScope Rerank 模型重排（主方案，模型名可配置）
 
     Returns:
         (重排结果, 是否降级为规则打分)
@@ -455,7 +455,7 @@ def rag_search(user_query: str, top_k: int = RAG_TOP_K, top_n: int = RAG_TOP_N) 
     1. Query 改写 → LLM 将口语化 query 改写为检索关键词
     2. 向量召回 → ChromaDB 语义搜索 Top-K（失败降级关键字匹配）
     2.5. 约束硬过滤 → 规则抽取否定/饮食约束，过滤候选（过滤为空返回未找到）
-    3. Rerank 重排 → DashScope gte-rerank 重排（失败降级规则打分）
+    3. Rerank 重排 → DashScope Rerank 模型重排（失败降级规则打分）
     3.5. 阈值拒答 → top1 rerank 分低于阈值返回空（触发"未找到"链路）
     3.6. 偏好微调 → 命中偏好标签的结果同分小幅上浮
     4. 返回 Top-N 结果 + 全链路执行日志
