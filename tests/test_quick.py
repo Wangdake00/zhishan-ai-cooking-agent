@@ -9,6 +9,10 @@
 
 import asyncio
 import sys
+from pathlib import Path
+
+# 允许直接 `python tests/test_quick.py` 运行，将项目根目录加入导入路径
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def _run(coro):
@@ -136,8 +140,9 @@ def test_intent_detection():
     r = detect_intent({"messages": [HumanMessage(content="分析一下营养成分")]})
     check("营养关键词: 营养", r["intent"] == "nutrition")
 
+    # 同时命中营养与菜谱关键词 → 复合意图走 general（已确认的路由行为）
     r = detect_intent({"messages": [HumanMessage(content="减脂餐怎么做")]})
-    check("营养关键词: 减脂", r["intent"] == "nutrition")
+    check("双命中: 减脂+怎么做 → general", r["intent"] == "general")
 
     # 菜谱意图
     r = detect_intent({"messages": [HumanMessage(content="推荐菜谱")]})
