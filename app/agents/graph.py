@@ -66,6 +66,9 @@ class AgentState(TypedDict, total=False):
     # 防幻觉接地事实（由确定性工具产出，覆盖语义；流末渲染权威数据卡 + 一致性校验）
     nutrition_facts: Optional[dict]
     recipe_facts: Optional[dict]
+    # 长会话摘要（覆盖式字段，非 reducer；单轮同步增量更新）
+    summary: str
+    summary_upto: int  # 摘要已覆盖的前置轮次数（按 state 原轮次计）
 
 
 # ========== 工具定义 ==========
@@ -708,7 +711,15 @@ async def nutrition_node(state: AgentState) -> dict:
     logger.debug(f"[nutrition_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[nutrition_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
-    messages = await build_llm_messages(system, state_messages, node="nutrition")
+    bundle = await build_llm_messages(
+        system,
+        state_messages,
+        summary=state.get("summary", ""),
+        summary_upto=state.get("summary_upto", 0),
+        llm=_model,
+        node="nutrition",
+    )
+    messages = bundle.messages
     logger.debug(f"[nutrition_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
@@ -720,7 +731,12 @@ async def nutrition_node(state: AgentState) -> dict:
         logger.debug(f"[nutrition_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
         logger.debug(f"[nutrition_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
         logger.debug(f"[nutrition_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
-        return {"messages": new_ai_messages, "nutrition_facts": nutrition_facts}
+        return {
+            "messages": new_ai_messages,
+            "nutrition_facts": nutrition_facts,
+            "summary": bundle.summary,
+            "summary_upto": bundle.summary_upto,
+        }
     except Exception as e:
         logger.error(f"[nutrition_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 营养分析处理失败：{str(e)}")
@@ -739,7 +755,15 @@ async def recipe_node(state: AgentState) -> dict:
     logger.debug(f"[recipe_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[recipe_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
-    messages = await build_llm_messages(system, state_messages, node="recipe")
+    bundle = await build_llm_messages(
+        system,
+        state_messages,
+        summary=state.get("summary", ""),
+        summary_upto=state.get("summary_upto", 0),
+        llm=_model,
+        node="recipe",
+    )
+    messages = bundle.messages
     logger.debug(f"[recipe_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
@@ -751,7 +775,12 @@ async def recipe_node(state: AgentState) -> dict:
         logger.debug(f"[recipe_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
         logger.debug(f"[recipe_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
         logger.debug(f"[recipe_node] 📌 reducer 合并结果: {len(state_messages)} (旧) + {len(new_ai_messages)} (新增) = {len(state_messages) + len(new_ai_messages)} (新 total)")
-        return {"messages": new_ai_messages, "recipe_facts": recipe_facts}
+        return {
+            "messages": new_ai_messages,
+            "recipe_facts": recipe_facts,
+            "summary": bundle.summary,
+            "summary_upto": bundle.summary_upto,
+        }
     except Exception as e:
         logger.error(f"[recipe_node] 执行失败: {e}")
         error_msg = AIMessage(content=f"😢 菜谱推荐处理失败：{str(e)}")
@@ -770,7 +799,15 @@ async def general_node(state: AgentState) -> dict:
     logger.debug(f"[general_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[general_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
 
-    messages = await build_llm_messages(system, state_messages, node="general")
+    bundle = await build_llm_messages(
+        system,
+        state_messages,
+        summary=state.get("summary", ""),
+        summary_upto=state.get("summary_upto", 0),
+        llm=_model,
+        node="general",
+    )
+    messages = bundle.messages
     logger.debug(f"[general_node] 加入 system prompt 后，调用 Agent 输入消息数: {len(messages)}")
 
     try:
@@ -786,6 +823,8 @@ async def general_node(state: AgentState) -> dict:
             "messages": new_ai_messages,
             "nutrition_facts": nutrition_facts,
             "recipe_facts": recipe_facts,
+            "summary": bundle.summary,
+            "summary_upto": bundle.summary_upto,
         }
     except Exception as e:
         logger.error(f"[general_node] 执行失败: {e}")

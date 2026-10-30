@@ -1,6 +1,6 @@
 """
-智膳 AI — 长会话上下文治理测试（P0 图片治理）
-==========================================
+智膳 AI — 长会话上下文治理测试（P0 图片治理 + P1 滑动窗口/摘要）
+==============================================================
 运行方式: python tests/test_context.py
 
 覆盖:
@@ -9,6 +9,8 @@
   3. 历史图片治理（占位替换、保留最近 N 张、当前轮保留）
   4. 图片解析失败降级（不抛出、不中断）
   5. 不修改持久化 state 消息对象
+  6. 短会话不触发裁剪 / 长会话触发且消息结构合法
+  7. 增量摘要 + 摘要失败降级（未超硬上限不裁剪 / 超硬上限降为无摘要窗口）
 """
 import asyncio
 import sys
@@ -16,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agents import context as ctx
 
@@ -60,6 +62,31 @@ def text_of(msg) -> list[str]:
     if not isinstance(msg.content, list):
         return [msg.content] if isinstance(msg.content, str) else []
     return [str(b.get("text", "")) for b in msg.content if b.get("type") == "text"]
+
+
+def build_turns(count: int, with_images: bool = True) -> list:
+    """构造指定轮数的会话（每轮含 1 张图 + 文本回复）"""
+    messages = []
+    for i in range(count):
+        if with_images:
+            messages.append(make_image_msg(f"第{i + 1}轮问题，带一张食材图", 1))
+        else:
+            messages.append(HumanMessage(content=f"第{i + 1}轮问题和饮食需求"))
+        messages.append(AIMessage(content=f"第{i + 1}轮回答，包含菜谱步骤和营养建议。" * 2))
+    return messages
+
+
+class FakeLLM:
+    """摘要 LLM 桩：可控成功/失败"""
+
+    def __init__(self, text: str = "用户目标减脂，忌口香菜；已推荐番茄鸡胸肉；未完成：计算晚餐热量。", fail: bool = False):
+        self.text = text
+        self.fail = fail
+
+    async def ainvoke(self, messages):
+        if self.fail:
+            raise RuntimeError("summary llm down")
+        return AIMessage(content=self.text)
 
 
 # ========== 1. token 估算 ==========
@@ -159,30 +186,115 @@ def test_build_llm_messages_degrade():
     original = ctx.apply_image_policy
     ctx.apply_image_policy = _broken
     try:
-        built = asyncio.run(ctx.build_llm_messages(AIMessage(content="system"), source, node="test"))
+        bundle = asyncio.run(ctx.build_llm_messages(AIMessage(content="system"), source, node="test"))
     finally:
         ctx.apply_image_policy = original
 
-    check("副本构造失败仍返回 system + 原始消息", len(built) == 1 + len(source))
-    check("副本构造失败不抛出异常", built[0].content == "system")
+    check("副本构造失败仍返回 system + 原始消息", len(bundle.messages) == 1 + len(source))
+    check("副本构造失败标记降级", bundle.trimmed is False and bundle.reason == "error")
+    check("副本构造失败不抛出异常", bundle.messages[0].content == "system")
+
+
+# ========== 6. 裁剪触发 ==========
+
+def test_window_trigger():
+    short = [
+        HumanMessage(content="鸡胸肉怎么做好吃"),
+        AIMessage(content="建议香煎鸡胸肉。"),
+        HumanMessage(content="那热量多少"),
+        AIMessage(content="约 165 kcal/100g。"),
+    ]
+    short_bundle = asyncio.run(ctx.build_llm_messages(SystemMessage(content="sys"), short, llm=FakeLLM()))
+    check("短会话不触发裁剪", not short_bundle.trimmed, f"reason={short_bundle.reason}")
+    check("短会话完整保留历史", len(short_bundle.messages) == 1 + len(short))
+
+    long_messages = build_turns(50)
+    long_bundle = asyncio.run(ctx.build_llm_messages(SystemMessage(content="sys"), long_messages, llm=FakeLLM()))
+    check("长会话触发裁剪", long_bundle.trimmed, f"reason={long_bundle.reason}")
+
+    turn_messages = [m for m in long_bundle.messages[1:] if not isinstance(m, SystemMessage)]
+    turns_after = ctx.group_turns(turn_messages)
+    check("裁剪后消息结构合法（每条 Human 在轮首）",
+          all(isinstance(t[0], HumanMessage) for t in turns_after if t))
+    check("裁剪保留首轮", "第1轮问题" in " ".join(text_of(turns_after[0][0])))
+    check("裁剪后轮数不超过 首轮+最近 N 轮",
+          len(turns_after) <= ctx.settings.context_keep_recent_turns + 1, f"实际={len(turns_after)}")
+
+    kept_images = sum(len(image_blocks(m)) for m in turn_messages)
+    check("窗口内图片仅保留最近 1 张历史图 + 当前轮图", kept_images == 2, f"实际={kept_images}")
+
+
+def test_increment_summary():
+    messages = build_turns(12, with_images=False)
+    bundle = asyncio.run(ctx.build_llm_messages(SystemMessage(content="sys"), messages, llm=FakeLLM()))
+    check("轮数超阈值触发裁剪", bundle.trimmed and bundle.reason == "turns", f"reason={bundle.reason}")
+    check("生成摘要并写回摘要状态", bool(bundle.summary) and 0 < bundle.summary_upto <= 12,
+          f"upto={bundle.summary_upto}")
+    check("摘要注入为独立 SystemMessage",
+          any(isinstance(m, SystemMessage) and "历史会话摘要" in m.content for m in bundle.messages))
+    check("摘要覆盖轮数等于滑出轮数",
+          bundle.summary_upto == len(messages) // 2 - ctx.settings.context_keep_recent_turns,
+          f"实际={bundle.summary_upto}")
+
+    # 二次触发时应增量摘要（不重复压缩已覆盖轮次）
+    more_messages = build_turns(14, with_images=False)
+    bundle2 = asyncio.run(ctx.build_llm_messages(
+        SystemMessage(content="sys"), more_messages,
+        summary=bundle.summary, summary_upto=bundle.summary_upto, llm=FakeLLM(),
+    ))
+    check("增量摘要覆盖新的滑出轮次",
+          bundle2.summary_upto == len(more_messages) // 2 - ctx.settings.context_keep_recent_turns,
+          f"实际={bundle2.summary_upto}")
+
+
+def test_summary_failure_degrade():
+    """摘要失败且未超硬上限：降级为不裁剪；超硬上限：退化为无摘要窗口"""
+    messages = build_turns(12, with_images=False)
+    bundle = asyncio.run(ctx.build_llm_messages(SystemMessage(content="sys"), messages, llm=FakeLLM(fail=True)))
+    check("摘要失败未超硬上限时降级为不裁剪", not bundle.trimmed and bundle.reason == "summary_failed",
+          f"reason={bundle.reason}")
+    check("摘要失败时完整保留历史", len(bundle.messages) == 1 + len(messages))
+
+    huge = build_turns(50)
+    huge_bundle = asyncio.run(ctx.build_llm_messages(SystemMessage(content="sys"), huge, llm=FakeLLM(fail=True)))
+    check("摘要失败且超硬上限时退化为无摘要窗口", huge_bundle.trimmed and huge_bundle.reason == "hard_limit",
+          f"reason={huge_bundle.reason}")
+    check("硬上限窗口内无摘要注入",
+          not any(isinstance(m, SystemMessage) and "历史会话摘要" in m.content for m in huge_bundle.messages))
+
+
+# ========== 7. 50 轮带图会话 token 对比 ==========
+
+def test_token_comparison():
+    messages = build_turns(50, with_images=True)
+    before = ctx.estimate_tokens(messages)
+    bundle = asyncio.run(ctx.build_llm_messages(SystemMessage(content="sys"), messages, llm=FakeLLM()))
+    after = ctx.estimate_tokens(bundle.messages)
+    print(f"    50 轮带图会话：改动前 ≈ {before} token → 改动后 ≈ {after} token，"
+          f"降幅 ≈ {round((1 - after / before) * 100, 1)}%")
+    check("50 轮带图会话 token 降幅大于 80%", after < before * 0.2, f"before={before}, after={after}")
 
 
 def main():
-    print("=" * 62)
-    print("智膳 AI — 上下文治理测试（P0 图片治理）")
-    print("=" * 62)
-    print(f"配置: image_govern={ctx.settings.context_image_govern_enabled}, "
-          f"keep_recent={ctx.settings.context_image_keep_recent}, "
-          f"persist={ctx.settings.context_image_persist}")
-    print("-" * 62)
+    print("=" * 66)
+    print("智膳 AI — 上下文治理测试（P0 + P1）")
+    print("=" * 66)
+    print(f"配置: max_turns={ctx.settings.context_max_turns}, max_tokens={ctx.settings.context_max_tokens}, "
+          f"keep_recent={ctx.settings.context_keep_recent_turns}, keep_first={ctx.settings.context_keep_first_turn}, "
+          f"hard_limit={ctx.settings.context_hard_limit_tokens}")
+    print("-" * 66)
 
     test_token_estimate()
     test_sanitize()
     test_image_governance()
     test_image_ref_degrade()
     test_build_llm_messages_degrade()
+    test_window_trigger()
+    test_increment_summary()
+    test_summary_failure_degrade()
+    test_token_comparison()
 
-    print("-" * 62)
+    print("-" * 66)
     print(f"通过 {_passed} / {_passed + _failed}")
     if _failed:
         print(f"{RED}有 {_failed} 项失败{END}")
