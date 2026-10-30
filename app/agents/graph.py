@@ -31,7 +31,7 @@ import traceback
 from app.common.logger import logger
 from app.core.config import settings
 from app.core.exceptions import RAGException
-from app.db import session_store, favorite_store
+from app.db import session_store, favorite_store, preference_store
 from app.rag.pipeline import rag_search
 from app.agents.utils import ensure_image_base64_data_url
 from app.agents.context import build_llm_messages
@@ -69,6 +69,8 @@ class AgentState(TypedDict, total=False):
     # 长会话摘要（覆盖式字段，非 reducer；单轮同步增量更新）
     summary: str
     summary_upto: int  # 摘要已覆盖的前置轮次数（按 state 原轮次计）
+    # 跨会话长期偏好（每轮由 stream_chat 读取并注入 system prompt）
+    preferences: list
 
 
 # ========== 工具定义 ==========
@@ -698,6 +700,85 @@ def _format_messages_debug(messages: list) -> str:
     return "\n".join(lines)
 
 
+# ========== 跨会话长期偏好 ==========
+
+# 只有出现这些显式表达才触发偏好抽取，避免把一次性需求写成长期记忆
+_PREFERENCE_TRIGGERS = (
+    "记住", "以后", "一直", "从来", "过敏", "忌口", "不吃", "不能吃", "别放", "不要放", "讨厌",
+)
+
+
+def _format_preferences(preferences: list) -> str:
+    """把长期偏好渲染成 system prompt 追加段（无偏好返回空串）"""
+    items = []
+    for item in preferences or []:
+        if isinstance(item, dict):
+            category = str(item.get("category", "其他") or "其他")
+            content = str(item.get("content", "")).strip()
+        else:
+            category, content = "其他", str(item).strip()
+        if content:
+            items.append(f"- [{category}] {content}")
+    if not items:
+        return ""
+    return "\n\n【用户长期偏好（跨会话记忆，必须优先遵守）】\n" + "\n".join(items)
+
+
+async def _extract_preferences(prompt: str) -> list[dict]:
+    """
+    从用户本轮输入中抽取可长期复用的饮食偏好（仅在命中显式触发词时调用一次）。
+
+    解析失败/超时均返回空列表，绝不中断主回答。
+    """
+    text = (prompt or "").strip()
+    if not text or not any(trigger in text for trigger in _PREFERENCE_TRIGGERS):
+        return []
+
+    instruction = (
+        "从用户这句话中抽取可长期复用的饮食偏好事实。\n"
+        "只抽取用户明确表达的稳定约束或偏好，忽略一次性需求（如'今天想吃什么'）。\n"
+        "category 只能是：忌口、过敏、目标、偏好、其他。\n"
+        "严格输出 JSON 数组，元素形如 "
+        '{"category":"忌口","content":"不吃香菜"}；没有可抽取内容时输出 []。\n\n'
+        f"用户原话：{text[:500]}"
+    )
+
+    try:
+        response = await asyncio.wait_for(
+            _model.ainvoke([SystemMessage(content="你是饮食偏好抽取器，只输出 JSON 数组。"),
+                            HumanMessage(content=instruction)]),
+            timeout=settings.llm_timeout_seconds,
+        )
+    except Exception as e:
+        logger.warning(f"[Preference] 偏好抽取失败（已跳过）: {type(e).__name__}: {e}")
+        return []
+
+    raw = response.content if isinstance(getattr(response, "content", ""), str) else str(
+        getattr(response, "content", "")
+    )
+    start, end = raw.find("["), raw.rfind("]")
+    if start < 0 or end <= start:
+        return []
+
+    try:
+        parsed = json.loads(raw[start:end + 1])
+    except Exception:
+        logger.warning("[Preference] 偏好 JSON 解析失败（已跳过）")
+        return []
+
+    extracted = []
+    for item in parsed if isinstance(parsed, list) else []:
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get("category", "其他") or "其他").strip()[:32] or "其他"
+        content = str(item.get("content", "")).strip()[:200]
+        if content:
+            extracted.append({"category": category, "content": content})
+    if extracted:
+        logger.info(f"[Preference] 本轮抽取到 {len(extracted)} 条显式偏好")
+    return extracted
+
+
 # ========== 子图节点 ==========
 
 async def nutrition_node(state: AgentState) -> dict:
@@ -706,7 +787,9 @@ async def nutrition_node(state: AgentState) -> dict:
     user_save_tool = make_save_favorite_tool(user_id)
     tools = [calculate_nutrition, generate_shopping_list, search_recipes_rag, user_save_tool]
 
-    system = SystemMessage(content=SYSTEM_PROMPTS["nutrition"])
+    system = SystemMessage(
+        content=SYSTEM_PROMPTS["nutrition"] + _format_preferences(state.get("preferences", []))
+    )
     state_messages = state.get("messages", [])
     logger.debug(f"[nutrition_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[nutrition_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
@@ -750,7 +833,9 @@ async def recipe_node(state: AgentState) -> dict:
     user_save_tool = make_save_favorite_tool(user_id)
     tools = [search_recipes_rag, tavily, generate_shopping_list, user_save_tool]
 
-    system = SystemMessage(content=SYSTEM_PROMPTS["recipe"])
+    system = SystemMessage(
+        content=SYSTEM_PROMPTS["recipe"] + _format_preferences(state.get("preferences", []))
+    )
     state_messages = state.get("messages", [])
     logger.debug(f"[recipe_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[recipe_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
@@ -794,7 +879,9 @@ async def general_node(state: AgentState) -> dict:
     user_save_tool = make_save_favorite_tool(user_id)
     tools = [search_recipes_rag, tavily, calculate_nutrition, generate_shopping_list, user_save_tool]
 
-    system = SystemMessage(content=SYSTEM_PROMPTS["general"])
+    system = SystemMessage(
+        content=SYSTEM_PROMPTS["general"] + _format_preferences(state.get("preferences", []))
+    )
     state_messages = state.get("messages", [])
     logger.debug(f"[general_node] 进入节点，state.messages 数量: {len(state_messages)}")
     logger.debug(f"[general_node] state.messages 详情:\n{_format_messages_debug(state_messages)}")
@@ -967,6 +1054,19 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
 
     await session_store.upsert_session(thread_id, user_id=user_id, title=(prompt or "上传了图片")[:30])
 
+    # 跨会话长期偏好：命中显式触发词才单次抽取，读取失败静默跳过（不影响主回答）
+    preferences: list = []
+    if settings.preference_memory_enabled:
+        try:
+            extracted = await _extract_preferences(prompt)
+            for item in extracted:
+                await preference_store.upsert_preference(user_id, item["category"], item["content"])
+            preferences = await preference_store.get_preferences(user_id, settings.preference_max_items)
+            if preferences:
+                logger.info(f"[Preference] 本轮注入长期偏好 {len(preferences)} 条")
+        except Exception as e:
+            logger.warning(f"[Preference] 偏好记忆处理失败（已跳过）: {type(e).__name__}: {e}")
+
     try:
         graph = await get_graph()
 
@@ -1024,6 +1124,7 @@ async def stream_chat(prompt: str, image_urls: list, thread_id: str, user_id: in
                 "user_prompt": prompt,
                 "image_urls": image_urls or [],
                 "intent": "general",
+                "preferences": preferences,
             },
             {"configurable": {"thread_id": thread_id}},
             stream_mode="messages",

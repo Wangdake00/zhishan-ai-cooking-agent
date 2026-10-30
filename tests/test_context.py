@@ -1,6 +1,6 @@
 """
-智膳 AI — 长会话上下文治理测试（P0 图片治理 + P1 滑动窗口/摘要）
-==============================================================
+智膳 AI — 长会话上下文治理测试（P0 图片治理 + P1 滑动窗口/摘要 + P2 偏好记忆）
+==============================================================================
 运行方式: python tests/test_context.py
 
 覆盖:
@@ -11,6 +11,7 @@
   5. 不修改持久化 state 消息对象
   6. 短会话不触发裁剪 / 长会话触发且消息结构合法
   7. 增量摘要 + 摘要失败降级（未超硬上限不裁剪 / 超硬上限降为无摘要窗口）
+  8. 跨会话偏好：显式触发词抽取、JSON 解析失败降级、system prompt 注入格式
 """
 import asyncio
 import sys
@@ -275,6 +276,53 @@ def test_token_comparison():
     check("50 轮带图会话 token 降幅大于 80%", after < before * 0.2, f"before={before}, after={after}")
 
 
+# ========== 8. 跨会话偏好记忆 ==========
+
+class FakeExtractLLM:
+    """偏好抽取 LLM 桩"""
+
+    def __init__(self, payload: str):
+        self.payload = payload
+        self.calls = 0
+
+    async def ainvoke(self, messages):
+        self.calls += 1
+        return AIMessage(content=self.payload)
+
+
+def test_preference_format():
+    from app.agents import graph as g
+
+    text = g._format_preferences([
+        {"category": "忌口", "content": "不吃香菜"},
+        {"category": "过敏", "content": "对花生过敏"},
+    ])
+    check("偏好注入段包含类别与内容", "【用户长期偏好" in text and "[忌口] 不吃香菜" in text)
+    check("无偏好时不注入", g._format_preferences([]) == "")
+
+
+def test_preference_extract():
+    from app.agents import graph as g
+
+    original_model = g._model
+    try:
+        fake = FakeExtractLLM('```json\n[{"category":"过敏","content":"对花生过敏"}]\n```')
+        g._model = fake
+        extracted = asyncio.run(g._extract_preferences("记住，我对花生过敏，以后别推荐含花生的菜"))
+        check("命中触发词时抽取偏好", extracted == [{"category": "过敏", "content": "对花生过敏"}],
+              f"实际={extracted}")
+
+        calls_before = fake.calls
+        empty = asyncio.run(g._extract_preferences("今晚想吃点清淡的"))
+        check("无触发词时不调用 LLM", empty == [] and fake.calls == calls_before)
+
+        g._model = FakeExtractLLM("这不是 JSON")
+        failed = asyncio.run(g._extract_preferences("记住我不吃辣"))
+        check("抽取结果非法时降级为空", failed == [])
+    finally:
+        g._model = original_model
+
+
 def main():
     print("=" * 66)
     print("智膳 AI — 上下文治理测试（P0 + P1）")
@@ -293,6 +341,8 @@ def main():
     test_increment_summary()
     test_summary_failure_degrade()
     test_token_comparison()
+    test_preference_format()
+    test_preference_extract()
 
     print("-" * 66)
     print(f"通过 {_passed} / {_passed + _failed}")
