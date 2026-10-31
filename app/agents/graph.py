@@ -33,6 +33,7 @@ from app.core.config import settings
 from app.core.exceptions import RAGException
 from app.db import session_store, favorite_store, preference_store
 from app.rag.pipeline import rag_search
+from app.rag.nutrition_data import find_ingredient, parse_ingredient_text, META as NUTRITION_META
 from app.agents.utils import ensure_image_base64_data_url
 from app.agents.context import build_llm_messages
 from app.common import oss
@@ -89,88 +90,32 @@ def calculate_nutrition(ingredients: str, servings: Optional[int] = 1) -> str:
     """
     logger.info(f"[工具调用] calculate_nutrition: ingredients={ingredients}, servings={servings}")
 
-    nutrition_db = {
-        "鸡胸肉": {"calories": 165, "protein": 31, "fat": 3.6, "carbs": 0, "fiber": 0},
-        "鸡腿肉": {"calories": 184, "protein": 20, "fat": 11, "carbs": 0, "fiber": 0},
-        "猪肉": {"calories": 242, "protein": 27, "fat": 14, "carbs": 0, "fiber": 0},
-        "牛肉": {"calories": 250, "protein": 26, "fat": 15, "carbs": 0, "fiber": 0},
-        "鸡蛋": {"calories": 155, "protein": 13, "fat": 11, "carbs": 1.1, "fiber": 0},
-        "豆腐": {"calories": 76, "protein": 8, "fat": 4.8, "carbs": 1.9, "fiber": 0.3},
-        "大米": {"calories": 365, "protein": 7, "fat": 0.6, "carbs": 79, "fiber": 1.3},
-        "面条": {"calories": 270, "protein": 9, "fat": 1.5, "carbs": 56, "fiber": 2.5},
-        "西兰花": {"calories": 34, "protein": 2.8, "fat": 0.4, "carbs": 7, "fiber": 2.6},
-        "胡萝卜": {"calories": 41, "protein": 0.9, "fat": 0.2, "carbs": 10, "fiber": 2.8},
-        "土豆": {"calories": 77, "protein": 2, "fat": 0.1, "carbs": 17, "fiber": 2.2},
-        "番茄": {"calories": 18, "protein": 0.9, "fat": 0.2, "carbs": 3.9, "fiber": 1.2},
-        "黄瓜": {"calories": 15, "protein": 0.8, "fat": 0.1, "carbs": 3.6, "fiber": 0.5},
-        "青菜": {"calories": 15, "protein": 1.5, "fat": 0.2, "carbs": 2.7, "fiber": 1.6},
-        "菠菜": {"calories": 23, "protein": 2.9, "fat": 0.4, "carbs": 3.6, "fiber": 2.2},
-        "白菜": {"calories": 12, "protein": 1.5, "fat": 0.1, "carbs": 2.2, "fiber": 1},
-        "洋葱": {"calories": 40, "protein": 1.1, "fat": 0.1, "carbs": 9.3, "fiber": 1.7},
-        "大蒜": {"calories": 149, "protein": 6.4, "fat": 0.5, "carbs": 33, "fiber": 2.1},
-        "辣椒": {"calories": 40, "protein": 1.9, "fat": 0.3, "carbs": 8.8, "fiber": 1.5},
-        "青椒": {"calories": 20, "protein": 0.9, "fat": 0.2, "carbs": 4.6, "fiber": 1.7},
-        "茄子": {"calories": 25, "protein": 1, "fat": 0.2, "carbs": 5.7, "fiber": 3},
-        "玉米": {"calories": 86, "protein": 3.2, "fat": 1.2, "carbs": 19, "fiber": 2.7},
-        "蘑菇": {"calories": 22, "protein": 3.1, "fat": 0.3, "carbs": 3.3, "fiber": 1},
-        "虾": {"calories": 99, "protein": 24, "fat": 0.3, "carbs": 0.2, "fiber": 0},
-        "鱼": {"calories": 165, "protein": 22, "fat": 8, "carbs": 0, "fiber": 0},
-        "三文鱼": {"calories": 208, "protein": 20, "fat": 13, "carbs": 0, "fiber": 0},
-        "牛奶": {"calories": 42, "protein": 3.4, "fat": 1, "carbs": 5, "fiber": 0},
-        "酸奶": {"calories": 59, "protein": 3.5, "fat": 3.3, "carbs": 3.6, "fiber": 0},
-        "芝士": {"calories": 402, "protein": 25, "fat": 33, "carbs": 3.5, "fiber": 0},
-        "苹果": {"calories": 52, "protein": 0.3, "fat": 0.2, "carbs": 14, "fiber": 2.4},
-        "香蕉": {"calories": 89, "protein": 1.1, "fat": 0.3, "carbs": 23, "fiber": 2.6},
-        "橄榄油": {"calories": 884, "protein": 0, "fat": 100, "carbs": 0, "fiber": 0},
-        "食用油": {"calories": 884, "protein": 0, "fat": 100, "carbs": 0, "fiber": 0},
-        "盐": {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "fiber": 0},
-        "酱油": {"calories": 53, "protein": 8, "fat": 0.1, "carbs": 4.9, "fiber": 0},
-        "糖": {"calories": 387, "protein": 0, "fat": 0, "carbs": 100, "fiber": 0},
-    }
-
-    ingredient_list = [x.strip() for x in ingredients.split(",")]
-    parsed_ingredients = []
-
-    for item in ingredient_list:
-        name = item
-        weight = 100
-        import re
-        match = re.search(r'(\d+)\s*g', item)
-        if match:
-            weight = int(match.group(1))
-            name = re.sub(r'\d+\s*g', '', item).strip()
-        else:
-            match = re.search(r'(\d+)\s*克', item)
-            if match:
-                weight = int(match.group(1))
-                name = re.sub(r'\d+\s*克', '', item).strip()
-        parsed_ingredients.append({"name": name, "weight": weight})
+    ingredient_list = [x.strip() for x in ingredients.replace("，", ",").split(",") if x.strip()]
+    parsed_ingredients = [parse_ingredient_text(item) for item in ingredient_list]
 
     results = []
     total = {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "fiber": 0}
+    unmatched = []
 
     for ing in parsed_ingredients:
-        matched_key = None
-        for key in nutrition_db:
-            if key in ing["name"] or ing["name"] in key:
-                matched_key = key
-                break
-        if matched_key:
+        entry = find_ingredient(ing["name"])
+        if entry:
             factor = ing["weight"] / 100.0 * servings
-            nutri = nutrition_db[matched_key]
+            per_100g = entry["per_100g"]
             item_result = {
                 "name": ing["name"],
                 "weight": ing["weight"],
-                "calories": round(nutri["calories"] * factor, 1),
-                "protein": round(nutri["protein"] * factor, 1),
-                "fat": round(nutri["fat"] * factor, 1),
-                "carbs": round(nutri["carbs"] * factor, 1),
-                "fiber": round(nutri["fiber"] * factor, 1),
+                "calories": round(per_100g["calories"] * factor, 1),
+                "protein": round(per_100g["protein"] * factor, 1),
+                "fat": round(per_100g["fat"] * factor, 1),
+                "carbs": round(per_100g["carbs"] * factor, 1),
+                "fiber": round(per_100g["fiber"] * factor, 1),
             }
             results.append(item_result)
             for k in total:
                 total[k] += item_result[k]
         else:
+            unmatched.append(ing["name"])
             results.append({"name": ing["name"], "weight": ing["weight"], "note": "未找到该食材的营养数据"})
 
     output = []
@@ -205,6 +150,11 @@ def calculate_nutrition(ingredients: str, servings: Optional[int] = 1) -> str:
         output.append("- ℹ️ 蛋白质摄入较高，肾功能不佳者请注意")
     else:
         output.append("- ✅ 蛋白质含量充足")
+
+    if unmatched:
+        output.append(f"\n> 未收录食材（未计入汇总）：{'、'.join(unmatched)}")
+    source = NUTRITION_META.get("source", "USDA FoodData Central SR Legacy")
+    output.append(f"\n> 营养数据来源：{source}（每 100g 可食部成分值，按食材克重累加）")
 
     return "\n".join(output)
 
@@ -498,7 +448,7 @@ SYSTEM_PROMPTS = {
     "recipe": """你是一名智能烹饪助手，专注于根据食材推荐菜谱。请按以下流程：
 
 1. 识别食材：若有照片，识别所有可见食材
-2. RAG 检索：优先调用 search_recipes_rag 检索本地 100 道经典菜谱
+2. RAG 检索：优先调用 search_recipes_rag 检索本地菜谱知识库
 3. 补充搜索：RAG 结果不足时，再用 web_search
 4. 排序推荐：从「食材匹配度 + 难度 + 营养」三维评分排序
 
@@ -809,7 +759,9 @@ async def nutrition_node(state: AgentState) -> dict:
         result_messages, tool_traces = await _run_agent_with_tools(
             messages, tools, required_tool="calculate_nutrition"
         )
-        new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
+        # result_messages 的前 len(messages) 条是本次送入 LLM 的历史副本，
+        # 必须跳过，否则历史 AI 消息会被当作新消息重复追加进 state（每轮滚雪球式重复）
+        new_ai_messages = [m for m in result_messages[len(messages):] if isinstance(m, AIMessage)]
         nutrition_facts = extract_nutrition_facts(tool_traces)
         logger.debug(f"[nutrition_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
         logger.debug(f"[nutrition_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
@@ -855,7 +807,9 @@ async def recipe_node(state: AgentState) -> dict:
         result_messages, tool_traces = await _run_agent_with_tools(
             messages, tools, required_tool="search_recipes_rag"
         )
-        new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
+        # result_messages 的前 len(messages) 条是本次送入 LLM 的历史副本，
+        # 必须跳过，否则历史 AI 消息会被当作新消息重复追加进 state（每轮滚雪球式重复）
+        new_ai_messages = [m for m in result_messages[len(messages):] if isinstance(m, AIMessage)]
         recipe_facts = extract_recipe_facts(tool_traces)
         logger.debug(f"[recipe_node] Agent 返回总消息数: {len(result_messages)}, 其中 AI 消息: {len(new_ai_messages)}")
         logger.debug(f"[recipe_node] 返回给 reducer 的新 AI 消息 (将追加到 messages):\n{_format_messages_debug(new_ai_messages)}")
@@ -899,7 +853,9 @@ async def general_node(state: AgentState) -> dict:
 
     try:
         result_messages, tool_traces = await _run_agent_with_tools(messages, tools)
-        new_ai_messages = [m for m in result_messages if isinstance(m, AIMessage)]
+        # result_messages 的前 len(messages) 条是本次送入 LLM 的历史副本，
+        # 必须跳过，否则历史 AI 消息会被当作新消息重复追加进 state（每轮滚雪球式重复）
+        new_ai_messages = [m for m in result_messages[len(messages):] if isinstance(m, AIMessage)]
         # 通用意图不强制工具，但若模型主动调用了营养/菜谱工具，同样提取事实做接地
         nutrition_facts = extract_nutrition_facts(tool_traces)
         recipe_facts = extract_recipe_facts(tool_traces)
@@ -1251,12 +1207,30 @@ async def _render_history_content(content):
     return rendered
 
 
+def _merge_history_content(previous, current):
+    """
+    合并同一轮内的多条助手消息内容
+
+    工具循环会产出多条 AIMessage（中间推理 + 最终回答），流式输出时它们原本
+    就拼接在同一个气泡里；历史读取必须保持一致，否则一条完整回答会被拆成多段
+    """
+    if isinstance(previous, str) and isinstance(current, str):
+        if not previous:
+            return current
+        if not current:
+            return previous
+        return f"{previous}\n\n{current}"
+    previous_blocks = previous if isinstance(previous, list) else [{"type": "text", "text": str(previous)}]
+    current_blocks = current if isinstance(current, list) else [{"type": "text", "text": str(current)}]
+    return previous_blocks + current_blocks
+
+
 async def get_messages(thread_id: str) -> list:
     """获取会话历史消息
     
     返回格式兼容前端多模态渲染：
     - 用户消息 content 可能是 str 或 list[dict]（LangChain image_url 格式）
-    - 同时提供 content_parts 便于前端直接消费多模态结构
+    - 同一轮的多条助手消息会合并为一条，与流式展示保持一致
     """
     logger.info(f"获取历史消息，thread_id: {thread_id}")
     cp = await _get_checkpointer()
@@ -1283,7 +1257,11 @@ async def get_messages(thread_id: str) -> list:
         role = "user" if isinstance(msg, HumanMessage) else "assistant" if isinstance(msg, AIMessage) else None
         if role is None:
             continue
-        result.append({"role": role, "content": await _render_history_content(content)})
+        rendered = await _render_history_content(content)
+        if role == "assistant" and result and result[-1]["role"] == "assistant":
+            result[-1]["content"] = _merge_history_content(result[-1]["content"], rendered)
+            continue
+        result.append({"role": role, "content": rendered})
 
     logger.info(f"[get_messages] 返回 {len(result)} 条历史消息, thread_id={thread_id}")
     return result

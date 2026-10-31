@@ -2,7 +2,7 @@
 RAG 向量存储模块
 - 使用 ChromaDB 作为本地向量数据库
 - 使用 DashScope Embedding 模型（通过 OpenAI 兼容接口），模型可配置
-- 提供 100 条菜谱的向量化存储和语义检索能力
+- 提供菜谱知识库的向量化存储和语义检索能力（条数以 recipes.json 为准）
 - 所有模型名称/路径/参数均可通过 settings 配置
 """
 
@@ -14,7 +14,7 @@ from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 
 from app.common.logger import logger
 from app.core.config import settings
-from app.rag.recipe_data import RECIPES
+from app.rag.recipe_data import RECIPES, META
 
 # ========== 从统一配置读取 ==========
 
@@ -29,6 +29,11 @@ EMBEDDING_MODEL = settings.embedding_model
 
 # Embedding 批量大小
 EMBEDDING_BATCH_SIZE = settings.embedding_batch_size
+
+# 知识库数据版本（recipes.json 的 meta.version）：版本变化时自动重建集合
+RECIPE_VERSION = str(META.get("version", "unknown"))
+RECIPE_SOURCE = (META.get("recipe_source") or {}).get("name", "")
+NUTRITION_SOURCE = (META.get("nutrition_source") or {}).get("name", "")
 
 # DashScope API 配置
 DASHSCOPE_API_KEY = settings.dashscope_api_key
@@ -57,7 +62,7 @@ def get_collection() -> chromadb.Collection:
     首次调用时：
     1. 创建持久化 ChromaDB 客户端
     2. 获取或创建 recipes 集合（绑定 DashScope Embedding）
-    3. 如果集合为空，自动灌入全部菜谱数据（RECIPES，当前 100 条）
+    3. 如果集合为空，自动灌入全部菜谱数据（RECIPES，条数以 recipes.json 为准）
     """
     global _client, _collection
 
@@ -73,19 +78,35 @@ def get_collection() -> chromadb.Collection:
         ef = _get_embedding_function()
         # 显式指定 cosine 距离空间（ChromaDB 默认为 l2），
         # 使 vector_recall 中 similarity = 1 - distance/2 的换算语义正确
+        metadata = {
+            "hnsw:space": "cosine",
+            "description": f"{settings.app_name} 菜谱知识库 - {len(RECIPES)} 道菜谱",
+            "recipe_version": RECIPE_VERSION,
+        }
         _collection = _client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=ef,
-            metadata={
-                "hnsw:space": "cosine",
-                "description": f"{settings.app_name} 菜谱知识库 - 100 道经典菜谱",
-            },
+            metadata=metadata,
         )
 
-        if _collection.count() == 0:
+        count = _collection.count()
+        stored_version = (_collection.metadata or {}).get("recipe_version")
+        if count == 0:
+            _ingest_recipes(_collection)
+        elif stored_version != RECIPE_VERSION:
+            # 数据文件升级后旧集合必须重建，否则会一直命中过期菜谱
+            logger.info(
+                f"[RAG] 知识库版本变化 {stored_version} -> {RECIPE_VERSION}，重建集合"
+            )
+            _client.delete_collection(COLLECTION_NAME)
+            _collection = _client.get_or_create_collection(
+                name=COLLECTION_NAME,
+                embedding_function=ef,
+                metadata=metadata,
+            )
             _ingest_recipes(_collection)
         else:
-            logger.info(f"[RAG] 向量库已有 {_collection.count()} 条菜谱，跳过灌入")
+            logger.info(f"[RAG] 向量库已有 {count} 条菜谱，版本一致，跳过灌入")
 
         return _collection
 
@@ -103,6 +124,8 @@ def _ingest_recipes(collection: chromadb.Collection):
     ids = []
 
     for recipe in RECIPES:
+        source = recipe.get("source") or {}
+        nutrition = recipe.get("nutrition_per_serving") or {}
         doc_text = (
             f"菜名：{recipe['name']}\n"
             f"菜系：{recipe['cuisine']}\n"
@@ -121,9 +144,14 @@ def _ingest_recipes(collection: chromadb.Collection):
             "cooking_time": recipe["cooking_time"],
             "ingredients": ", ".join(recipe["ingredients"]),
             "steps": recipe["steps"],
-            "nutrition": str(recipe["nutrition_per_serving"]),
+            "nutrition": str(nutrition),
+            "calories": float(nutrition.get("calories", 0)),
             "tags": ", ".join(recipe["tags"]),
             "description": recipe["description"],
+            "source_name": str(source.get("name", RECIPE_SOURCE)),
+            "source_url": str(source.get("url", "")),
+            "source_license": str(source.get("license", "")),
+            "nutrition_source": str(NUTRITION_SOURCE),
         })
         ids.append(recipe["id"])
 

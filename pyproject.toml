@@ -24,6 +24,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "uvicorn>=0.52.0",
     "pydantic-settings>=2.14.2",
+    "python-multipart>=0.0.32",
 ]
 
 [[tool.uv.index]]

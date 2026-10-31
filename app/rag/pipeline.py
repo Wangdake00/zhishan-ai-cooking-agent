@@ -198,6 +198,9 @@ _CONSTRAINT_TRIGGER_RE = re.compile(r"(?:不|别|免|戒|忌[口嘴]?|无|少)[�
 # 约束目标 → (需排除的食材/名称子串, 需排除的标签子串)；匹配时按触发词长度降序（"猪肉"先于"肉"）
 _NEGATION_RULES = [
     ("猪肉", (["猪", "火腿", "培根", "腊肉", "猪油"], [])),
+    # "鸡肉"类排除子串只取真实鸡肉食材形态；单字"鸡"会误杀 27 道仅用"鸡精"调味的菜
+    # （梅菜扣肉/小酥肉/糖醋排骨等），鸡蛋/蛋黄/蛋清天然不含以下子串
+    ("鸡肉", (["鸡肉", "鸡胸", "鸡腿", "鸡翅", "鸡爪"], [])),
     ("辣", (["辣椒", "干辣椒", "泡椒", "小米辣", "辣椒油"], ["辣"])),
     ("麻", (["花椒", "麻椒", "藤椒"], ["麻辣"])),
     ("油", (["油炸", "肥肉", "五花"], ["油炸", "红油", "油腻"])),
@@ -210,7 +213,7 @@ _NEGATION_RULES = [
 # 关键词触发的硬约束（无需否定词）
 _HALAL_EXCLUDE = ["猪", "火腿", "培根", "腊肉", "猪油"]
 _LOW_CAL_KEYWORDS = ["减脂", "减肥", "低卡", "低热量", "瘦身"]
-_LOW_CAL_LIMIT = 300  # kcal/份，库内菜品热量约 210~380，300 大致保留低卡一半
+_LOW_CAL_LIMIT = 400  # kcal/整菜，与 build_kb.py 派生标签"低卡"阈值对齐（2026-11-01 新库整菜口径 p25≈380）
 # "清淡"语义上排斥强刺激口味（仅排除麻辣/香辣等级，微辣不受影响）
 _LIGHT_EXCLUDE_TAGS = ["麻辣", "香辣", "红油", "油炸"]
 
@@ -257,7 +260,8 @@ def extract_constraints(query: str) -> Dict:
     for m in _CONSTRAINT_TRIGGER_RE.finditer(query):
         target = m.group(1)
         negated_targets.append(target)
-        for trigger, (ing_subs, tag_subs) in _NEGATION_RULES:
+        # 最长 trigger 优先，保证"鸡肉"先于泛化"肉"命中（"猪肉"先于"肉"同理）
+        for trigger, (ing_subs, tag_subs) in sorted(_NEGATION_RULES, key=lambda r: -len(r[0])):
             if trigger in target:
                 exclude_ingredients.extend(ing_subs)
                 exclude_tags.extend(tag_subs)

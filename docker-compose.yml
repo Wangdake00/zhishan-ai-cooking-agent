@@ -33,7 +33,7 @@ services:
       # 显式覆盖 .env 中面向本地开发的 POSTGRES_HOST=127.0.0.1
       POSTGRES_HOST: postgres
     volumes:
-      # 命名卷持久化向量库：容器重建/镜像升级后不重复灌入 100 条菜谱
+      # 命名卷持久化向量库：容器重建/镜像升级后不重复灌入菜谱（数据版本变化时会自动重建）
       - chroma_data:/app/db/chroma_data
     depends_on:
       postgres:

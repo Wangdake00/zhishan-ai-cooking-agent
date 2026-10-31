@@ -1,0 +1,3808 @@
+{
+ "meta": {
+  "version": "2026.11.01.1",
+  "source": "USDA FoodData Central SR Legacy",
+  "url": "https://fdc.nal.usda.gov/",
+  "license": "Public Domain",
+  "note": "每 100g 可食部。数值为 USDA SR Legacy 对应食物条目原值，未做烹饪损耗修正。"
+ },
+ "ingredients": {
+  "丁香": {
+   "usda_id": 171321,
+   "usda_description": "Spices, cloves, ground",
+   "per_100g": {
+    "calories": 274.0,
+    "protein": 5.97,
+    "fat": 13.0,
+    "carbs": 65.53,
+    "fiber": 33.9
+   },
+   "default_unit_grams": {
+    "粒": 0.5,
+    "个": 0.5,
+    "颗": 0.5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "三文鱼": {
+   "usda_id": 175167,
+   "usda_description": "Fish, salmon, Atlantic, farmed, raw",
+   "per_100g": {
+    "calories": 208.0,
+    "protein": 20.42,
+    "fat": 13.42,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 120
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "中筋面粉": {
+   "usda_id": 168894,
+   "usda_description": "Wheat flour, white, all-purpose, enriched, bleached",
+   "per_100g": {
+    "calories": 364.0,
+    "protein": 10.33,
+    "fat": 0.98,
+    "carbs": 76.31,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "五花肉": {
+   "usda_id": 167812,
+   "usda_description": "Pork, fresh, belly, raw",
+   "per_100g": {
+    "calories": 518.0,
+    "protein": 9.34,
+    "fat": 53.01,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "块": 50
+   },
+   "category": "畜肉",
+   "matched": true
+  },
+  "五香粉": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以黑胡椒近似"
+  },
+  "低筋面粉": {
+   "usda_id": 168894,
+   "usda_description": "Wheat flour, white, all-purpose, enriched, bleached",
+   "per_100g": {
+    "calories": 364.0,
+    "protein": 10.33,
+    "fat": 0.98,
+    "carbs": 76.31,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "全脂牛奶": {
+   "usda_id": 171265,
+   "usda_description": "Milk, whole, 3.25% milkfat, with added vitamin D",
+   "per_100g": {
+    "calories": 61.0,
+    "protein": 3.15,
+    "fat": 3.25,
+    "carbs": 4.8,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "杯": 240
+   },
+   "category": "乳制品",
+   "matched": true
+  },
+  "八角": {
+   "usda_id": 171316,
+   "usda_description": "Spices, anise seed",
+   "per_100g": {
+    "calories": 337.0,
+    "protein": 17.6,
+    "fat": 15.9,
+    "carbs": 50.02,
+    "fiber": 14.6
+   },
+   "default_unit_grams": {
+    "颗": 3,
+    "个": 3,
+    "粒": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "冬瓜": {
+   "usda_id": 170069,
+   "usda_description": "Waxgourd, (chinese preserving melon), raw",
+   "per_100g": {
+    "calories": 13.0,
+    "protein": 0.4,
+    "fat": 0.2,
+    "carbs": 3.0,
+    "fiber": 2.9
+   },
+   "default_unit_grams": {
+    "块": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "冬笋": {
+   "usda_id": 169210,
+   "usda_description": "Bamboo shoots, raw",
+   "per_100g": {
+    "calories": 27.0,
+    "protein": 2.6,
+    "fat": 0.3,
+    "carbs": 5.2,
+    "fiber": 2.2
+   },
+   "default_unit_grams": {
+    "根": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "冰糖": {
+   "usda_id": 169655,
+   "usda_description": "Sugars, granulated",
+   "per_100g": {
+    "calories": 387.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 99.98,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "块": 5,
+    "粒": 5,
+    "颗": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "包菜": {
+   "usda_id": 169975,
+   "usda_description": "Cabbage, raw",
+   "per_100g": {
+    "calories": 25.0,
+    "protein": 1.28,
+    "fat": 0.1,
+    "carbs": 5.8,
+    "fiber": 2.5
+   },
+   "default_unit_grams": {
+    "颗": 300
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "十三香": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以黑胡椒近似"
+  },
+  "午餐肉": {
+   "usda_id": 174571,
+   "usda_description": "Luncheon meat, pork, canned",
+   "per_100g": {
+    "calories": 334.0,
+    "protein": 12.5,
+    "fat": 30.3,
+    "carbs": 2.1,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 20
+   },
+   "category": "加工肉",
+   "matched": true
+  },
+  "南瓜": {
+   "usda_id": 168448,
+   "usda_description": "Pumpkin, raw",
+   "per_100g": {
+    "calories": 26.0,
+    "protein": 1.0,
+    "fat": 0.1,
+    "carbs": 6.5,
+    "fiber": 0.5
+   },
+   "default_unit_grams": {
+    "块": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "印度综合香料粉": {
+   "usda_id": 170924,
+   "usda_description": "Spices, curry powder",
+   "per_100g": {
+    "calories": 325.0,
+    "protein": 14.29,
+    "fat": 14.01,
+    "carbs": 55.83,
+    "fiber": 53.2
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以咖喱粉近似"
+  },
+  "口蘑": {
+   "usda_id": 169251,
+   "usda_description": "Mushrooms, white, raw",
+   "per_100g": {
+    "calories": 22.0,
+    "protein": 3.09,
+    "fat": 0.34,
+    "carbs": 3.26,
+    "fiber": 1.0
+   },
+   "default_unit_grams": {
+    "朵": 15,
+    "个": 15
+   },
+   "category": "菌菇",
+   "matched": true
+  },
+  "可乐": {
+   "usda_id": 175113,
+   "usda_description": "Carbonated beverage, low calorie, other than cola or pepper, with sodium saccharin, without caffeine",
+   "per_100g": {
+    "calories": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.1,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "罐": 330
+   },
+   "category": "饮料",
+   "matched": true,
+   "assumption": "以低热量碳酸饮料近似"
+  },
+  "可可粉": {
+   "usda_id": 169593,
+   "usda_description": "Cocoa, dry powder, unsweetened",
+   "per_100g": {
+    "calories": 228.0,
+    "protein": 19.6,
+    "fat": 13.7,
+    "carbs": 57.9,
+    "fiber": 37.0
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "吉利丁": {
+   "usda_id": 169599,
+   "usda_description": "Gelatins, dry powder, unsweetened",
+   "per_100g": {
+    "calories": 335.0,
+    "protein": 85.6,
+    "fat": 0.1,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "吐司": {
+   "usda_id": 174924,
+   "usda_description": "Bread, white, commercially prepared (includes soft bread crumbs)",
+   "per_100g": {
+    "calories": 266.0,
+    "protein": 8.85,
+    "fat": 3.33,
+    "carbs": 49.42,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {
+    "片": 30
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "味极鲜": {
+   "usda_id": 174277,
+   "usda_description": "Soy sauce made from soy and wheat (shoyu)",
+   "per_100g": {
+    "calories": 53.0,
+    "protein": 8.14,
+    "fat": 0.57,
+    "carbs": 4.93,
+    "fiber": 0.8
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "味精": {
+   "usda_id": 173468,
+   "usda_description": "Salt, table",
+   "per_100g": {
+    "calories": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "按零热量调味料计"
+  },
+  "咖喱块": {
+   "usda_id": 170924,
+   "usda_description": "Spices, curry powder",
+   "per_100g": {
+    "calories": 325.0,
+    "protein": 14.29,
+    "fat": 14.01,
+    "carbs": 55.83,
+    "fiber": 53.2
+   },
+   "default_unit_grams": {
+    "块": 15,
+    "盒": 100
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "啤酒": {
+   "usda_id": 168746,
+   "usda_description": "Alcoholic beverage, beer, regular, all",
+   "per_100g": {
+    "calories": 43.0,
+    "protein": 0.46,
+    "fat": 0.0,
+    "carbs": 3.55,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "瓶": 500,
+    "罐": 330
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "四季豆": {
+   "usda_id": 169961,
+   "usda_description": "Beans, snap, green, raw",
+   "per_100g": {
+    "calories": 31.0,
+    "protein": 1.83,
+    "fat": 0.22,
+    "carbs": 6.97,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "土豆": {
+   "usda_id": 170026,
+   "usda_description": "Potatoes, flesh and skin, raw",
+   "per_100g": {
+    "calories": 77.0,
+    "protein": 2.05,
+    "fat": 0.09,
+    "carbs": 17.49,
+    "fiber": 2.1
+   },
+   "default_unit_grams": {
+    "个": 150,
+    "块": 30
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "土豆淀粉": {
+   "usda_id": 169698,
+   "usda_description": "Cornstarch",
+   "per_100g": {
+    "calories": 381.0,
+    "protein": 0.26,
+    "fat": 0.05,
+    "carbs": 91.27,
+    "fiber": 0.9
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "培根": {
+   "usda_id": 168277,
+   "usda_description": "Pork, cured, bacon, unprepared",
+   "per_100g": {
+    "calories": 393.0,
+    "protein": 13.66,
+    "fat": 37.13,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 15
+   },
+   "category": "加工肉",
+   "matched": true
+  },
+  "大米": {
+   "usda_id": 168877,
+   "usda_description": "Rice, white, long-grain, regular, raw, enriched",
+   "per_100g": {
+    "calories": 365.0,
+    "protein": 7.13,
+    "fat": 0.66,
+    "carbs": 79.95,
+    "fiber": 1.3
+   },
+   "default_unit_grams": {
+    "碗": 200
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "大蒜": {
+   "usda_id": 169230,
+   "usda_description": "Garlic, raw",
+   "per_100g": {
+    "calories": 149.0,
+    "protein": 6.36,
+    "fat": 0.5,
+    "carbs": 33.06,
+    "fiber": 2.1
+   },
+   "default_unit_grams": {
+    "瓣": 5,
+    "颗": 30,
+    "粒": 5,
+    "头": 30,
+    "个": 5
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "奶油": {
+   "usda_id": 170859,
+   "usda_description": "Cream, fluid, heavy whipping",
+   "per_100g": {
+    "calories": 340.0,
+    "protein": 2.84,
+    "fat": 36.08,
+    "carbs": 2.84,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "乳制品",
+   "matched": true
+  },
+  "奶油奶酪": {
+   "usda_id": 173418,
+   "usda_description": "Cheese, cream",
+   "per_100g": {
+    "calories": 350.0,
+    "protein": 6.15,
+    "fat": 34.44,
+    "carbs": 5.52,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "乳制品",
+   "matched": true
+  },
+  "姜": {
+   "usda_id": 169231,
+   "usda_description": "Ginger root, raw",
+   "per_100g": {
+    "calories": 80.0,
+    "protein": 1.82,
+    "fat": 0.75,
+    "carbs": 17.77,
+    "fiber": 2.0
+   },
+   "default_unit_grams": {
+    "片": 5,
+    "块": 20,
+    "个": 20
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "姜黄粉": {
+   "usda_id": 172231,
+   "usda_description": "Spices, turmeric, ground",
+   "per_100g": {
+    "calories": 312.0,
+    "protein": 9.68,
+    "fat": 3.25,
+    "carbs": 67.14,
+    "fiber": 22.7
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "娃娃菜": {
+   "usda_id": 169975,
+   "usda_description": "Cabbage, raw",
+   "per_100g": {
+    "calories": 25.0,
+    "protein": 1.28,
+    "fat": 0.1,
+    "carbs": 5.8,
+    "fiber": 2.5
+   },
+   "default_unit_grams": {
+    "颗": 150,
+    "个": 150
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "孜然籽": {
+   "usda_id": 170923,
+   "usda_description": "Spices, cumin seed",
+   "per_100g": {
+    "calories": 375.0,
+    "protein": 17.81,
+    "fat": 22.27,
+    "carbs": 44.24,
+    "fiber": 10.5
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "孜然粉": {
+   "usda_id": 170923,
+   "usda_description": "Spices, cumin seed",
+   "per_100g": {
+    "calories": 375.0,
+    "protein": 17.81,
+    "fat": 22.27,
+    "carbs": 44.24,
+    "fiber": 10.5
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "小米": {
+   "usda_id": 169702,
+   "usda_description": "Millet, raw",
+   "per_100g": {
+    "calories": 378.0,
+    "protein": 11.02,
+    "fat": 4.22,
+    "carbs": 72.85,
+    "fiber": 8.5
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "小米辣": {
+   "usda_id": 170106,
+   "usda_description": "Peppers, hot chili, red, raw",
+   "per_100g": {
+    "calories": 40.0,
+    "protein": 1.87,
+    "fat": 0.44,
+    "carbs": 8.81,
+    "fiber": 1.5
+   },
+   "default_unit_grams": {
+    "个": 5,
+    "根": 5,
+    "只": 5,
+    "条": 5
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "小苏打": {
+   "usda_id": 175040,
+   "usda_description": "Leavening agents, baking soda",
+   "per_100g": {
+    "calories": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "茶匙": 4
+   },
+   "category": "膨松剂",
+   "matched": true
+  },
+  "小茴香": {
+   "usda_id": 171323,
+   "usda_description": "Spices, fennel seed",
+   "per_100g": {
+    "calories": 345.0,
+    "protein": 15.8,
+    "fat": 14.87,
+    "carbs": 52.29,
+    "fiber": 39.8
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "小豆蔻粉": {
+   "usda_id": 170919,
+   "usda_description": "Spices, cardamom",
+   "per_100g": {
+    "calories": 311.0,
+    "protein": 10.76,
+    "fat": 6.7,
+    "carbs": 68.47,
+    "fiber": 28.0
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "小龙虾": {
+   "usda_id": 174206,
+   "usda_description": "Crustaceans, crayfish, mixed species, wild, raw",
+   "per_100g": {
+    "calories": 77.0,
+    "protein": 15.97,
+    "fat": 0.95,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "只": 20
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "山药": {
+   "usda_id": 170071,
+   "usda_description": "Yam, raw",
+   "per_100g": {
+    "calories": 118.0,
+    "protein": 1.53,
+    "fat": 0.17,
+    "carbs": 27.88,
+    "fiber": 4.1
+   },
+   "default_unit_grams": {
+    "根": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "巴沙鱼": {
+   "usda_id": 174191,
+   "usda_description": "Fish, cod, Pacific, raw",
+   "per_100g": {
+    "calories": 69.0,
+    "protein": 15.27,
+    "fat": 0.41,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 120
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "干辣椒": {
+   "usda_id": 170106,
+   "usda_description": "Peppers, hot chili, red, raw",
+   "per_100g": {
+    "calories": 40.0,
+    "protein": 1.87,
+    "fat": 0.44,
+    "carbs": 8.81,
+    "fiber": 1.5
+   },
+   "default_unit_grams": {
+    "个": 2,
+    "根": 2,
+    "只": 2,
+    "支": 2,
+    "条": 2
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "干辣椒面": {
+   "usda_id": 170932,
+   "usda_description": "Spices, pepper, red or cayenne",
+   "per_100g": {
+    "calories": 318.0,
+    "protein": 12.01,
+    "fat": 17.27,
+    "carbs": 56.63,
+    "fiber": 27.2
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "干香菇": {
+   "usda_id": 168436,
+   "usda_description": "Mushrooms, shiitake, dried",
+   "per_100g": {
+    "calories": 296.0,
+    "protein": 9.58,
+    "fat": 0.99,
+    "carbs": 75.37,
+    "fiber": 11.5
+   },
+   "default_unit_grams": {
+    "朵": 5
+   },
+   "category": "菌菇",
+   "matched": true
+  },
+  "年糕": {
+   "usda_id": 168883,
+   "usda_description": "Rice, white, glutinous, unenriched, uncooked",
+   "per_100g": {
+    "calories": 370.0,
+    "protein": 6.81,
+    "fat": 0.55,
+    "carbs": 81.68,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "片": 15,
+    "根": 100
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "意面": {
+   "usda_id": 169736,
+   "usda_description": "Pasta, dry, enriched",
+   "per_100g": {
+    "calories": 371.0,
+    "protein": 13.04,
+    "fat": 1.51,
+    "carbs": 74.67,
+    "fiber": 3.2
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "排骨": {
+   "usda_id": 167853,
+   "usda_description": "Pork, fresh, spareribs, separable lean and fat, raw",
+   "per_100g": {
+    "calories": 277.0,
+    "protein": 15.47,
+    "fat": 23.4,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "根": 100,
+    "块": 30
+   },
+   "category": "畜肉",
+   "matched": true
+  },
+  "料酒": {
+   "usda_id": 169070,
+   "usda_description": "Alcoholic beverage, wine, cooking",
+   "per_100g": {
+    "calories": 50.0,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 6.3,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "无盐黄油": {
+   "usda_id": 173430,
+   "usda_description": "Butter, without salt",
+   "per_100g": {
+    "calories": 717.0,
+    "protein": 0.85,
+    "fat": 81.11,
+    "carbs": 0.06,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "块": 10
+   },
+   "category": "乳制品",
+   "matched": true
+  },
+  "朗姆酒": {
+   "usda_id": 169070,
+   "usda_description": "Alcoholic beverage, wine, cooking",
+   "per_100g": {
+    "calories": 50.0,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 6.3,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "木耳": {
+   "usda_id": 168581,
+   "usda_description": "Fungi, Cloud ears, dried",
+   "per_100g": {
+    "calories": 284.0,
+    "protein": 9.25,
+    "fat": 0.73,
+    "carbs": 73.01,
+    "fiber": 70.1
+   },
+   "default_unit_grams": {},
+   "category": "菌菇",
+   "matched": true
+  },
+  "杏仁": {
+   "usda_id": 170567,
+   "usda_description": "Nuts, almonds",
+   "per_100g": {
+    "calories": 579.0,
+    "protein": 21.15,
+    "fat": 49.93,
+    "carbs": 21.55,
+    "fiber": 12.5
+   },
+   "default_unit_grams": {
+    "粒": 1.2
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "柠檬": {
+   "usda_id": 167746,
+   "usda_description": "Lemons, raw, without peel",
+   "per_100g": {
+    "calories": 29.0,
+    "protein": 1.1,
+    "fat": 0.3,
+    "carbs": 9.32,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "个": 100,
+    "颗": 100
+   },
+   "category": "水果",
+   "matched": true
+  },
+  "柠檬汁": {
+   "usda_id": 167747,
+   "usda_description": "Lemon juice, raw",
+   "per_100g": {
+    "calories": 22.0,
+    "protein": 0.35,
+    "fat": 0.24,
+    "carbs": 6.9,
+    "fiber": 0.3
+   },
+   "default_unit_grams": {},
+   "category": "水果",
+   "matched": true
+  },
+  "柱侯酱": {
+   "usda_id": 172886,
+   "usda_description": "Sauce, hoisin, ready-to-serve",
+   "per_100g": {
+    "calories": 220.0,
+    "protein": 3.31,
+    "fat": 3.39,
+    "carbs": 44.08,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以海鲜酱近似"
+  },
+  "核桃": {
+   "usda_id": 170187,
+   "usda_description": "Nuts, walnuts, english",
+   "per_100g": {
+    "calories": 654.0,
+    "protein": 15.23,
+    "fat": 65.21,
+    "carbs": 13.71,
+    "fiber": 6.7
+   },
+   "default_unit_grams": {
+    "个": 10
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "桂圆": {
+   "usda_id": 169089,
+   "usda_description": "Longans, raw",
+   "per_100g": {
+    "calories": 60.0,
+    "protein": 1.31,
+    "fat": 0.1,
+    "carbs": 15.14,
+    "fiber": 1.1
+   },
+   "default_unit_grams": {
+    "颗": 5,
+    "个": 5
+   },
+   "category": "水果",
+   "matched": true
+  },
+  "桂皮": {
+   "usda_id": 171320,
+   "usda_description": "Spices, cinnamon, ground",
+   "per_100g": {
+    "calories": 247.0,
+    "protein": 3.99,
+    "fat": 1.24,
+    "carbs": 80.59,
+    "fiber": 53.1
+   },
+   "default_unit_grams": {
+    "块": 5,
+    "片": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "植物油": {
+   "usda_id": 171411,
+   "usda_description": "Oil, soybean, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "椰浆": {
+   "usda_id": 170173,
+   "usda_description": "Nuts, coconut milk, canned (liquid expressed from grated meat and water)",
+   "per_100g": {
+    "calories": 197.0,
+    "protein": 2.02,
+    "fat": 21.33,
+    "carbs": 2.81,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "杯": 240
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "橄榄油": {
+   "usda_id": 171413,
+   "usda_description": "Oil, olive, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "欧芹": {
+   "usda_id": 170416,
+   "usda_description": "Parsley, fresh",
+   "per_100g": {
+    "calories": 36.0,
+    "protein": 2.97,
+    "fat": 0.79,
+    "carbs": 6.33,
+    "fiber": 3.3
+   },
+   "default_unit_grams": {
+    "棵": 15,
+    "把": 30
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "毛豆": {
+   "usda_id": 169282,
+   "usda_description": "Soybeans, green, raw",
+   "per_100g": {
+    "calories": 147.0,
+    "protein": 12.95,
+    "fat": 6.8,
+    "carbs": 11.05,
+    "fiber": 4.2
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "水": {
+   "usda_id": 0,
+   "usda_description": "Water",
+   "per_100g": {
+    "calories": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "杯": 240
+   },
+   "category": "其他",
+   "matched": true
+  },
+  "油麦菜": {
+   "usda_id": 169247,
+   "usda_description": "Lettuce, cos or romaine, raw",
+   "per_100g": {
+    "calories": 17.0,
+    "protein": 1.23,
+    "fat": 0.3,
+    "carbs": 3.29,
+    "fiber": 2.1
+   },
+   "default_unit_grams": {
+    "颗": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "泡打粉": {
+   "usda_id": 172803,
+   "usda_description": "Leavening agents, baking powder, double-acting, sodium aluminum sulfate",
+   "per_100g": {
+    "calories": 53.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 27.7,
+    "fiber": 0.2
+   },
+   "default_unit_grams": {
+    "茶匙": 4
+   },
+   "category": "膨松剂",
+   "matched": true
+  },
+  "洋葱": {
+   "usda_id": 170000,
+   "usda_description": "Onions, raw",
+   "per_100g": {
+    "calories": 40.0,
+    "protein": 1.1,
+    "fat": 0.1,
+    "carbs": 9.34,
+    "fiber": 1.7
+   },
+   "default_unit_grams": {
+    "个": 150
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "海鲜酱": {
+   "usda_id": 172886,
+   "usda_description": "Sauce, hoisin, ready-to-serve",
+   "per_100g": {
+    "calories": 220.0,
+    "protein": 3.31,
+    "fat": 3.39,
+    "carbs": 44.08,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "淀粉": {
+   "usda_id": 169698,
+   "usda_description": "Cornstarch",
+   "per_100g": {
+    "calories": 381.0,
+    "protein": 0.26,
+    "fat": 0.05,
+    "carbs": 91.27,
+    "fiber": 0.9
+   },
+   "default_unit_grams": {
+    "勺": 10
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "淡奶油": {
+   "usda_id": 170859,
+   "usda_description": "Cream, fluid, heavy whipping",
+   "per_100g": {
+    "calories": 340.0,
+    "protein": 2.84,
+    "fat": 36.08,
+    "carbs": 2.84,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "乳制品",
+   "matched": true
+  },
+  "火腿": {
+   "usda_id": 167875,
+   "usda_description": "Pork, cured, ham, whole, separable lean and fat, unheated",
+   "per_100g": {
+    "calories": 246.0,
+    "protein": 18.49,
+    "fat": 18.52,
+    "carbs": 0.06,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 15
+   },
+   "category": "加工肉",
+   "matched": true
+  },
+  "火腿肠": {
+   "usda_id": 174587,
+   "usda_description": "Luncheon sausage, pork and beef",
+   "per_100g": {
+    "calories": 260.0,
+    "protein": 15.38,
+    "fat": 20.9,
+    "carbs": 1.58,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "根": 40
+   },
+   "category": "加工肉",
+   "matched": true
+  },
+  "熟花生": {
+   "usda_id": 173806,
+   "usda_description": "Peanuts, all types, dry-roasted, without salt",
+   "per_100g": {
+    "calories": 587.0,
+    "protein": 24.35,
+    "fat": 49.66,
+    "carbs": 21.26,
+    "fiber": 8.4
+   },
+   "default_unit_grams": {
+    "粒": 1,
+    "颗": 1
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "燕麦": {
+   "usda_id": 173904,
+   "usda_description": "Cereals, oats, regular and quick, not fortified, dry",
+   "per_100g": {
+    "calories": 379.0,
+    "protein": 13.15,
+    "fat": 6.52,
+    "carbs": 67.7,
+    "fiber": 10.1
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "牛奶": {
+   "usda_id": 171265,
+   "usda_description": "Milk, whole, 3.25% milkfat, with added vitamin D",
+   "per_100g": {
+    "calories": 61.0,
+    "protein": 3.15,
+    "fat": 3.25,
+    "carbs": 4.8,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "杯": 240,
+    "盒": 250,
+    "袋": 200
+   },
+   "category": "乳制品",
+   "matched": true
+  },
+  "牛肉": {
+   "usda_id": 169483,
+   "usda_description": "Beef, composite of trimmed retail cuts, separable lean and fat, trimmed to 1/8\" fat, all grades, raw",
+   "per_100g": {
+    "calories": 215.0,
+    "protein": 20.01,
+    "fat": 14.42,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true
+  },
+  "牛腩": {
+   "usda_id": 169483,
+   "usda_description": "Beef, composite of trimmed retail cuts, separable lean and fat, trimmed to 1/8\" fat, all grades, raw",
+   "per_100g": {
+    "calories": 215.0,
+    "protein": 20.01,
+    "fat": 14.42,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true
+  },
+  "牛蛙": {
+   "usda_id": 168148,
+   "usda_description": "Frog legs, raw",
+   "per_100g": {
+    "calories": 73.0,
+    "protein": 16.4,
+    "fat": 0.3,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "只": 150,
+    "个": 150
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "猪油": {
+   "usda_id": 171401,
+   "usda_description": "Lard",
+   "per_100g": {
+    "calories": 902.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "猪肉": {
+   "usda_id": 167818,
+   "usda_description": "Pork, fresh, loin, whole, separable lean and fat, raw",
+   "per_100g": {
+    "calories": 198.0,
+    "protein": 19.74,
+    "fat": 12.58,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true
+  },
+  "猪肉末": {
+   "usda_id": 167818,
+   "usda_description": "Pork, fresh, loin, whole, separable lean and fat, raw",
+   "per_100g": {
+    "calories": 198.0,
+    "protein": 19.74,
+    "fat": 12.58,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true
+  },
+  "猪蹄": {
+   "usda_id": 167818,
+   "usda_description": "Pork, fresh, loin, whole, separable lean and fat, raw",
+   "per_100g": {
+    "calories": 198.0,
+    "protein": 19.74,
+    "fat": 12.58,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true,
+   "assumption": "以猪里脊近似"
+  },
+  "玉米": {
+   "usda_id": 169998,
+   "usda_description": "Corn, sweet, yellow, raw",
+   "per_100g": {
+    "calories": 86.0,
+    "protein": 3.27,
+    "fat": 1.35,
+    "carbs": 18.7,
+    "fiber": 2.0
+   },
+   "default_unit_grams": {
+    "根": 200,
+    "个": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "玉米油": {
+   "usda_id": 171411,
+   "usda_description": "Oil, soybean, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "玉米淀粉": {
+   "usda_id": 169698,
+   "usda_description": "Cornstarch",
+   "per_100g": {
+    "calories": 381.0,
+    "protein": 0.26,
+    "fat": 0.05,
+    "carbs": 91.27,
+    "fiber": 0.9
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "玉米粒": {
+   "usda_id": 169998,
+   "usda_description": "Corn, sweet, yellow, raw",
+   "per_100g": {
+    "calories": 86.0,
+    "protein": 3.27,
+    "fat": 1.35,
+    "carbs": 18.7,
+    "fiber": 2.0
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "甜面酱": {
+   "usda_id": 172886,
+   "usda_description": "Sauce, hoisin, ready-to-serve",
+   "per_100g": {
+    "calories": 220.0,
+    "protein": 3.31,
+    "fat": 3.39,
+    "carbs": 44.08,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以海鲜酱近似"
+  },
+  "生抽": {
+   "usda_id": 174277,
+   "usda_description": "Soy sauce made from soy and wheat (shoyu)",
+   "per_100g": {
+    "calories": 53.0,
+    "protein": 8.14,
+    "fat": 0.57,
+    "carbs": 4.93,
+    "fiber": 0.8
+   },
+   "default_unit_grams": {
+    "勺": 15,
+    "汤匙": 15,
+    "茶匙": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "生粉": {
+   "usda_id": 169698,
+   "usda_description": "Cornstarch",
+   "per_100g": {
+    "calories": 381.0,
+    "protein": 0.26,
+    "fat": 0.05,
+    "carbs": 91.27,
+    "fiber": 0.9
+   },
+   "default_unit_grams": {
+    "勺": 10
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "生菜": {
+   "usda_id": 169248,
+   "usda_description": "Lettuce, iceberg (includes crisphead types), raw",
+   "per_100g": {
+    "calories": 14.0,
+    "protein": 0.9,
+    "fat": 0.14,
+    "carbs": 2.97,
+    "fiber": 1.2
+   },
+   "default_unit_grams": {
+    "颗": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "生蚝": {
+   "usda_id": 171978,
+   "usda_description": "Mollusks, oyster, eastern, wild, raw",
+   "per_100g": {
+    "calories": 51.0,
+    "protein": 5.71,
+    "fat": 1.71,
+    "carbs": 2.72,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 80,
+    "只": 80
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "番茄": {
+   "usda_id": 170457,
+   "usda_description": "Tomatoes, red, ripe, raw, year round average",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.88,
+    "fat": 0.2,
+    "carbs": 3.89,
+    "fiber": 1.2
+   },
+   "default_unit_grams": {
+    "个": 150,
+    "只": 150
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "番茄酱": {
+   "usda_id": 168556,
+   "usda_description": "Catsup",
+   "per_100g": {
+    "calories": 101.0,
+    "protein": 1.04,
+    "fat": 0.1,
+    "carbs": 27.4,
+    "fiber": 0.3
+   },
+   "default_unit_grams": {
+    "勺": 17
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "瘦肉": {
+   "usda_id": 168249,
+   "usda_description": "Pork, fresh, loin, tenderloin, separable lean only, raw",
+   "per_100g": {
+    "calories": 109.0,
+    "protein": 20.95,
+    "fat": 2.17,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true
+  },
+  "白砂糖": {
+   "usda_id": 169655,
+   "usda_description": "Sugars, granulated",
+   "per_100g": {
+    "calories": 387.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 99.98,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 10
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "白糖": {
+   "usda_id": 169655,
+   "usda_description": "Sugars, granulated",
+   "per_100g": {
+    "calories": 387.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 99.98,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 10,
+    "汤匙": 15,
+    "茶匙": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "白胡椒粉": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "白芝麻": {
+   "usda_id": 170150,
+   "usda_description": "Seeds, sesame seeds, whole, dried",
+   "per_100g": {
+    "calories": 573.0,
+    "protein": 17.73,
+    "fat": 49.67,
+    "carbs": 23.45,
+    "fiber": 11.8
+   },
+   "default_unit_grams": {
+    "勺": 8
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "白芸豆": {
+   "usda_id": 175202,
+   "usda_description": "Beans, white, mature seeds, raw",
+   "per_100g": {
+    "calories": 333.0,
+    "protein": 23.36,
+    "fat": 0.85,
+    "carbs": 60.27,
+    "fiber": 15.2
+   },
+   "default_unit_grams": {},
+   "category": "豆类",
+   "matched": true
+  },
+  "白菜": {
+   "usda_id": 169975,
+   "usda_description": "Cabbage, raw",
+   "per_100g": {
+    "calories": 25.0,
+    "protein": 1.28,
+    "fat": 0.1,
+    "carbs": 5.8,
+    "fiber": 2.5
+   },
+   "default_unit_grams": {
+    "颗": 300,
+    "棵": 300
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "白萝卜": {
+   "usda_id": 168451,
+   "usda_description": "Radishes, oriental, raw",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.6,
+    "fat": 0.1,
+    "carbs": 4.1,
+    "fiber": 1.6
+   },
+   "default_unit_grams": {
+    "根": 300,
+    "个": 300
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "白酒": {
+   "usda_id": 169070,
+   "usda_description": "Alcoholic beverage, wine, cooking",
+   "per_100g": {
+    "calories": 50.0,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 6.3,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "白醋": {
+   "usda_id": 172237,
+   "usda_description": "Vinegar, distilled",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.04,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "皮蛋": {
+   "usda_id": 172189,
+   "usda_description": "Egg, duck, whole, fresh, raw",
+   "per_100g": {
+    "calories": 185.0,
+    "protein": 12.81,
+    "fat": 13.77,
+    "carbs": 1.45,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 60
+   },
+   "category": "蛋类",
+   "matched": true
+  },
+  "盐": {
+   "usda_id": 173468,
+   "usda_description": "Salt, table",
+   "per_100g": {
+    "calories": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "汤匙": 15,
+    "茶匙": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "砂糖": {
+   "usda_id": 169655,
+   "usda_description": "Sugars, granulated",
+   "per_100g": {
+    "calories": 387.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 99.98,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 10
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "空心菜": {
+   "usda_id": 169301,
+   "usda_description": "Water convolvulus,raw",
+   "per_100g": {
+    "calories": 19.0,
+    "protein": 2.6,
+    "fat": 0.2,
+    "carbs": 3.13,
+    "fiber": 2.1
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "笋": {
+   "usda_id": 169210,
+   "usda_description": "Bamboo shoots, raw",
+   "per_100g": {
+    "calories": 27.0,
+    "protein": 2.6,
+    "fat": 0.3,
+    "carbs": 5.2,
+    "fiber": 2.2
+   },
+   "default_unit_grams": {
+    "根": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "米粉": {
+   "usda_id": 168877,
+   "usda_description": "Rice, white, long-grain, regular, raw, enriched",
+   "per_100g": {
+    "calories": 365.0,
+    "protein": 7.13,
+    "fat": 0.66,
+    "carbs": 79.95,
+    "fiber": 1.3
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true,
+   "assumption": "以大米近似"
+  },
+  "米酒": {
+   "usda_id": 167723,
+   "usda_description": "Alcoholic beverage, rice (sake)",
+   "per_100g": {
+    "calories": 134.0,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 5.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "米醋": {
+   "usda_id": 172237,
+   "usda_description": "Vinegar, distilled",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.04,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "米饭": {
+   "usda_id": 168878,
+   "usda_description": "Rice, white, long-grain, regular, enriched, cooked",
+   "per_100g": {
+    "calories": 130.0,
+    "protein": 2.69,
+    "fat": 0.28,
+    "carbs": 28.17,
+    "fiber": 0.4
+   },
+   "default_unit_grams": {
+    "碗": 200
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "粉丝": {
+   "usda_id": 168877,
+   "usda_description": "Rice, white, long-grain, regular, raw, enriched",
+   "per_100g": {
+    "calories": 365.0,
+    "protein": 7.13,
+    "fat": 0.66,
+    "carbs": 79.95,
+    "fiber": 1.3
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true,
+   "assumption": "以大米近似"
+  },
+  "糖": {
+   "usda_id": 169655,
+   "usda_description": "Sugars, granulated",
+   "per_100g": {
+    "calories": 387.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 99.98,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 10
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "糯米": {
+   "usda_id": 168883,
+   "usda_description": "Rice, white, glutinous, unenriched, uncooked",
+   "per_100g": {
+    "calories": 370.0,
+    "protein": 6.81,
+    "fat": 0.55,
+    "carbs": 81.68,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "紫菜": {
+   "usda_id": 168458,
+   "usda_description": "Seaweed, laver, raw",
+   "per_100g": {
+    "calories": 35.0,
+    "protein": 5.81,
+    "fat": 0.28,
+    "carbs": 5.11,
+    "fiber": 0.3
+   },
+   "default_unit_grams": {
+    "片": 3
+   },
+   "category": "藻类",
+   "matched": true
+  },
+  "红枣": {
+   "usda_id": 168152,
+   "usda_description": "Jujube, Chinese, fresh, dried",
+   "per_100g": {
+    "calories": 281.0,
+    "protein": 4.72,
+    "fat": 0.5,
+    "carbs": 72.52,
+    "fiber": 6.0
+   },
+   "default_unit_grams": {
+    "颗": 5,
+    "个": 5,
+    "粒": 5
+   },
+   "category": "干果",
+   "matched": true
+  },
+  "红椒": {
+   "usda_id": 170108,
+   "usda_description": "Peppers, sweet, red, raw",
+   "per_100g": {
+    "calories": 26.0,
+    "protein": 0.99,
+    "fat": 0.3,
+    "carbs": 6.03,
+    "fiber": 2.1
+   },
+   "default_unit_grams": {
+    "个": 50,
+    "条": 50
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "红茶": {
+   "usda_id": 0,
+   "usda_description": "Water",
+   "per_100g": {
+    "calories": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "杯": 240
+   },
+   "category": "其他",
+   "matched": true,
+   "assumption": "按零热量茶汤计"
+  },
+  "红辣椒粉": {
+   "usda_id": 170932,
+   "usda_description": "Spices, pepper, red or cayenne",
+   "per_100g": {
+    "calories": 318.0,
+    "protein": 12.01,
+    "fat": 17.27,
+    "carbs": 56.63,
+    "fiber": 27.2
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "绿豆芽": {
+   "usda_id": 169957,
+   "usda_description": "Mung beans, mature seeds, sprouted, raw",
+   "per_100g": {
+    "calories": 30.0,
+    "protein": 3.04,
+    "fat": 0.18,
+    "carbs": 5.94,
+    "fiber": 1.8
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "羊排": {
+   "usda_id": 172479,
+   "usda_description": "Lamb, composite of trimmed retail cuts, separable lean and fat, trimmed to 1/4\" fat, choice, raw",
+   "per_100g": {
+    "calories": 267.0,
+    "protein": 16.88,
+    "fat": 21.59,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "根": 100
+   },
+   "category": "畜肉",
+   "matched": true
+  },
+  "羊肉": {
+   "usda_id": 172479,
+   "usda_description": "Lamb, composite of trimmed retail cuts, separable lean and fat, trimmed to 1/4\" fat, choice, raw",
+   "per_100g": {
+    "calories": 267.0,
+    "protein": 16.88,
+    "fat": 21.59,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true
+  },
+  "老抽": {
+   "usda_id": 174277,
+   "usda_description": "Soy sauce made from soy and wheat (shoyu)",
+   "per_100g": {
+    "calories": 53.0,
+    "protein": 8.14,
+    "fat": 0.57,
+    "carbs": 4.93,
+    "fiber": 0.8
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "肋排": {
+   "usda_id": 167853,
+   "usda_description": "Pork, fresh, spareribs, separable lean and fat, raw",
+   "per_100g": {
+    "calories": 277.0,
+    "protein": 15.47,
+    "fat": 23.4,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "根": 100,
+    "块": 30
+   },
+   "category": "畜肉",
+   "matched": true
+  },
+  "胡椒粉": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "胡萝卜": {
+   "usda_id": 170393,
+   "usda_description": "Carrots, raw",
+   "per_100g": {
+    "calories": 41.0,
+    "protein": 0.93,
+    "fat": 0.24,
+    "carbs": 9.58,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "根": 100,
+    "个": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "腊肠": {
+   "usda_id": 172938,
+   "usda_description": "Salami, dry or hard, pork",
+   "per_100g": {
+    "calories": 407.0,
+    "protein": 22.58,
+    "fat": 33.72,
+    "carbs": 1.6,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "根": 60,
+    "条": 60
+   },
+   "category": "畜肉",
+   "matched": true,
+   "assumption": "以萨拉米近似"
+  },
+  "腐竹": {
+   "usda_id": 172450,
+   "usda_description": "Tofu, dried-frozen (koyadofu)",
+   "per_100g": {
+    "calories": 477.0,
+    "protein": 52.47,
+    "fat": 30.34,
+    "carbs": 10.03,
+    "fiber": 7.2
+   },
+   "default_unit_grams": {},
+   "category": "豆制品",
+   "matched": true
+  },
+  "腰果": {
+   "usda_id": 170162,
+   "usda_description": "Nuts, cashew nuts, raw",
+   "per_100g": {
+    "calories": 553.0,
+    "protein": 18.22,
+    "fat": 43.85,
+    "carbs": 30.19,
+    "fiber": 3.3
+   },
+   "default_unit_grams": {
+    "粒": 2,
+    "颗": 2
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "芋头": {
+   "usda_id": 169308,
+   "usda_description": "Taro, raw",
+   "per_100g": {
+    "calories": 112.0,
+    "protein": 1.5,
+    "fat": 0.2,
+    "carbs": 26.46,
+    "fiber": 4.1
+   },
+   "default_unit_grams": {
+    "个": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "芝士": {
+   "usda_id": 173414,
+   "usda_description": "Cheese, cheddar (Includes foods for USDA's Food Distribution Program)",
+   "per_100g": {
+    "calories": 403.0,
+    "protein": 22.87,
+    "fat": 33.31,
+    "carbs": 3.37,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "乳制品",
+   "matched": true
+  },
+  "芝士片": {
+   "usda_id": 173414,
+   "usda_description": "Cheese, cheddar (Includes foods for USDA's Food Distribution Program)",
+   "per_100g": {
+    "calories": 403.0,
+    "protein": 22.87,
+    "fat": 33.31,
+    "carbs": 3.37,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 20
+   },
+   "category": "乳制品",
+   "matched": true
+  },
+  "芝麻": {
+   "usda_id": 170150,
+   "usda_description": "Seeds, sesame seeds, whole, dried",
+   "per_100g": {
+    "calories": 573.0,
+    "protein": 17.73,
+    "fat": 49.67,
+    "carbs": 23.45,
+    "fiber": 11.8
+   },
+   "default_unit_grams": {
+    "勺": 8
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "芝麻油": {
+   "usda_id": 171016,
+   "usda_description": "Oil, sesame, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "芝麻酱": {
+   "usda_id": 170189,
+   "usda_description": "Seeds, sesame butter, tahini, from roasted and toasted kernels (most common type)",
+   "per_100g": {
+    "calories": 595.0,
+    "protein": 17.0,
+    "fat": 53.76,
+    "carbs": 21.19,
+    "fiber": 9.3
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "芥末": {
+   "usda_id": 172234,
+   "usda_description": "Mustard, prepared, yellow",
+   "per_100g": {
+    "calories": 60.0,
+    "protein": 3.74,
+    "fat": 3.34,
+    "carbs": 5.83,
+    "fiber": 4.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "花椒": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3,
+    "粒": 0.2
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以黑胡椒近似"
+  },
+  "花椒油": {
+   "usda_id": 171016,
+   "usda_description": "Oil, sesame, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true,
+   "assumption": "以芝麻油近似"
+  },
+  "花椒粉": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以黑胡椒近似"
+  },
+  "花生": {
+   "usda_id": 172430,
+   "usda_description": "Peanuts, all types, raw",
+   "per_100g": {
+    "calories": 567.0,
+    "protein": 25.8,
+    "fat": 49.24,
+    "carbs": 16.13,
+    "fiber": 8.5
+   },
+   "default_unit_grams": {
+    "粒": 1,
+    "颗": 1
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "花生油": {
+   "usda_id": 171410,
+   "usda_description": "Oil, peanut, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "花生碎": {
+   "usda_id": 173806,
+   "usda_description": "Peanuts, all types, dry-roasted, without salt",
+   "per_100g": {
+    "calories": 587.0,
+    "protein": 24.35,
+    "fat": 49.66,
+    "carbs": 21.26,
+    "fiber": 8.4
+   },
+   "default_unit_grams": {
+    "勺": 8
+   },
+   "category": "坚果",
+   "matched": true
+  },
+  "花生酱": {
+   "usda_id": 174294,
+   "usda_description": "Peanut Butter, smooth (Includes foods for USDA's Food Distribution Program)",
+   "per_100g": {
+    "calories": 588.0,
+    "protein": 21.93,
+    "fat": 49.54,
+    "carbs": 23.98,
+    "fiber": 5.7
+   },
+   "default_unit_grams": {
+    "勺": 16
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "花菜": {
+   "usda_id": 169986,
+   "usda_description": "Cauliflower, raw",
+   "per_100g": {
+    "calories": 25.0,
+    "protein": 1.92,
+    "fat": 0.28,
+    "carbs": 4.97,
+    "fiber": 2.0
+   },
+   "default_unit_grams": {
+    "颗": 300
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "芹菜": {
+   "usda_id": 169988,
+   "usda_description": "Celery, raw",
+   "per_100g": {
+    "calories": 14.0,
+    "protein": 0.69,
+    "fat": 0.17,
+    "carbs": 2.97,
+    "fiber": 1.6
+   },
+   "default_unit_grams": {
+    "根": 50
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "苦瓜": {
+   "usda_id": 168393,
+   "usda_description": "Balsam-pear (bitter gourd), pods, raw",
+   "per_100g": {
+    "calories": 17.0,
+    "protein": 1.0,
+    "fat": 0.17,
+    "carbs": 3.7,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "根": 200,
+    "个": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "茄子": {
+   "usda_id": 169228,
+   "usda_description": "Eggplant, raw",
+   "per_100g": {
+    "calories": 25.0,
+    "protein": 0.98,
+    "fat": 0.18,
+    "carbs": 5.88,
+    "fiber": 3.0
+   },
+   "default_unit_grams": {
+    "个": 250,
+    "根": 250
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "茴香": {
+   "usda_id": 171323,
+   "usda_description": "Spices, fennel seed",
+   "per_100g": {
+    "calories": 345.0,
+    "protein": 15.8,
+    "fat": 14.87,
+    "carbs": 52.29,
+    "fiber": 39.8
+   },
+   "default_unit_grams": {
+    "颗": 0.5,
+    "粒": 0.5
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "按茴香籽近似"
+  },
+  "草果": {
+   "usda_id": 170919,
+   "usda_description": "Spices, cardamom",
+   "per_100g": {
+    "calories": 311.0,
+    "protein": 10.76,
+    "fat": 6.7,
+    "carbs": 68.47,
+    "fiber": 28.0
+   },
+   "default_unit_grams": {
+    "个": 3,
+    "颗": 3
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "USDA 无草果，以豆蔻近似"
+  },
+  "草莓": {
+   "usda_id": 167762,
+   "usda_description": "Strawberries, raw",
+   "per_100g": {
+    "calories": 32.0,
+    "protein": 0.67,
+    "fat": 0.3,
+    "carbs": 7.68,
+    "fiber": 2.0
+   },
+   "default_unit_grams": {
+    "颗": 15,
+    "个": 15
+   },
+   "category": "水果",
+   "matched": true
+  },
+  "草鱼": {
+   "usda_id": 171952,
+   "usda_description": "Fish, carp, raw",
+   "per_100g": {
+    "calories": 127.0,
+    "protein": 17.83,
+    "fat": 5.6,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "条": 500
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "荷兰豆": {
+   "usda_id": 170010,
+   "usda_description": "Peas, edible-podded, raw",
+   "per_100g": {
+    "calories": 42.0,
+    "protein": 2.8,
+    "fat": 0.2,
+    "carbs": 7.55,
+    "fiber": 2.6
+   },
+   "default_unit_grams": {
+    "个": 3,
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "莲藕": {
+   "usda_id": 169250,
+   "usda_description": "Lotus root, raw",
+   "per_100g": {
+    "calories": 74.0,
+    "protein": 2.6,
+    "fat": 0.1,
+    "carbs": 17.23,
+    "fiber": 4.9
+   },
+   "default_unit_grams": {
+    "节": 200,
+    "根": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "菜籽油": {
+   "usda_id": 172336,
+   "usda_description": "Oil, canola",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "菠菜": {
+   "usda_id": 168462,
+   "usda_description": "Spinach, raw",
+   "per_100g": {
+    "calories": 23.0,
+    "protein": 2.86,
+    "fat": 0.39,
+    "carbs": 3.63,
+    "fiber": 2.2
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "葡萄干": {
+   "usda_id": 168165,
+   "usda_description": "Raisins, dark, seedless (Includes foods for USDA's Food Distribution Program)",
+   "per_100g": {
+    "calories": 299.0,
+    "protein": 3.3,
+    "fat": 0.25,
+    "carbs": 79.32,
+    "fiber": 4.5
+   },
+   "default_unit_grams": {},
+   "category": "干果",
+   "matched": true
+  },
+  "葡萄酒": {
+   "usda_id": 169070,
+   "usda_description": "Alcoholic beverage, wine, cooking",
+   "per_100g": {
+    "calories": 50.0,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 6.3,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "杯": 150
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "葱": {
+   "usda_id": 170005,
+   "usda_description": "Onions, spring or scallions (includes tops and bulb), raw",
+   "per_100g": {
+    "calories": 32.0,
+    "protein": 1.83,
+    "fat": 0.19,
+    "carbs": 7.34,
+    "fiber": 2.6
+   },
+   "default_unit_grams": {
+    "根": 30,
+    "棵": 30,
+    "把": 100,
+    "圈": 2,
+    "个": 30
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "蒜苗": {
+   "usda_id": 170005,
+   "usda_description": "Onions, spring or scallions (includes tops and bulb), raw",
+   "per_100g": {
+    "calories": 32.0,
+    "protein": 1.83,
+    "fat": 0.19,
+    "carbs": 7.34,
+    "fiber": 2.6
+   },
+   "default_unit_grams": {
+    "根": 30
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "蒸鱼豉油": {
+   "usda_id": 174277,
+   "usda_description": "Soy sauce made from soy and wheat (shoyu)",
+   "per_100g": {
+    "calories": 53.0,
+    "protein": 8.14,
+    "fat": 0.57,
+    "carbs": 4.93,
+    "fiber": 0.8
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "蘑菇": {
+   "usda_id": 169251,
+   "usda_description": "Mushrooms, white, raw",
+   "per_100g": {
+    "calories": 22.0,
+    "protein": 3.09,
+    "fat": 0.34,
+    "carbs": 3.26,
+    "fiber": 1.0
+   },
+   "default_unit_grams": {
+    "朵": 15,
+    "个": 15
+   },
+   "category": "菌菇",
+   "matched": true
+  },
+  "虾": {
+   "usda_id": 174210,
+   "usda_description": "Crustaceans, shrimp, mixed species, raw",
+   "per_100g": {
+    "calories": 71.0,
+    "protein": 13.61,
+    "fat": 1.01,
+    "carbs": 0.91,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "只": 10,
+    "个": 10
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "虾皮": {
+   "usda_id": 174210,
+   "usda_description": "Crustaceans, shrimp, mixed species, raw",
+   "per_100g": {
+    "calories": 71.0,
+    "protein": 13.61,
+    "fat": 1.01,
+    "carbs": 0.91,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "水产",
+   "matched": true,
+   "assumption": "以鲜虾近似"
+  },
+  "蚝油": {
+   "usda_id": 174529,
+   "usda_description": "Sauce, oyster, ready-to-serve",
+   "per_100g": {
+    "calories": 51.0,
+    "protein": 1.35,
+    "fat": 0.25,
+    "carbs": 10.92,
+    "fiber": 0.3
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "蛋清": {
+   "usda_id": 172183,
+   "usda_description": "Egg, white, raw, fresh",
+   "per_100g": {
+    "calories": 52.0,
+    "protein": 10.9,
+    "fat": 0.17,
+    "carbs": 0.73,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 33
+   },
+   "category": "蛋类",
+   "matched": true
+  },
+  "蛋黄": {
+   "usda_id": 172184,
+   "usda_description": "Egg, yolk, raw, fresh",
+   "per_100g": {
+    "calories": 322.0,
+    "protein": 15.86,
+    "fat": 26.54,
+    "carbs": 3.59,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 17
+   },
+   "category": "蛋类",
+   "matched": true
+  },
+  "蜂蜜": {
+   "usda_id": 169640,
+   "usda_description": "Honey",
+   "per_100g": {
+    "calories": 304.0,
+    "protein": 0.3,
+    "fat": 0.0,
+    "carbs": 82.4,
+    "fiber": 0.2
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "蟹": {
+   "usda_id": 174204,
+   "usda_description": "Crustaceans, crab, blue, raw",
+   "per_100g": {
+    "calories": 87.0,
+    "protein": 18.06,
+    "fat": 1.08,
+    "carbs": 0.04,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "只": 300
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "西兰花": {
+   "usda_id": 170379,
+   "usda_description": "Broccoli, raw",
+   "per_100g": {
+    "calories": 34.0,
+    "protein": 2.82,
+    "fat": 0.37,
+    "carbs": 6.64,
+    "fiber": 2.6
+   },
+   "default_unit_grams": {
+    "颗": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "西红柿": {
+   "usda_id": 170457,
+   "usda_description": "Tomatoes, red, ripe, raw, year round average",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.88,
+    "fat": 0.2,
+    "carbs": 3.89,
+    "fiber": 1.2
+   },
+   "default_unit_grams": {
+    "个": 150,
+    "只": 150
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "西葫芦": {
+   "usda_id": 169291,
+   "usda_description": "Squash, summer, zucchini, includes skin, raw",
+   "per_100g": {
+    "calories": 17.0,
+    "protein": 1.21,
+    "fat": 0.32,
+    "carbs": 3.11,
+    "fiber": 1.0
+   },
+   "default_unit_grams": {
+    "根": 200,
+    "个": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "豆干": {
+   "usda_id": 172448,
+   "usda_description": "Tofu, firm, prepared with calcium sulfate and magnesium chloride (nigari)",
+   "per_100g": {
+    "calories": 78.0,
+    "protein": 9.04,
+    "fat": 4.17,
+    "carbs": 2.85,
+    "fiber": 0.9
+   },
+   "default_unit_grams": {
+    "块": 50
+   },
+   "category": "豆制品",
+   "matched": true,
+   "assumption": "以老豆腐近似"
+  },
+  "豆瓣酱": {
+   "usda_id": 171605,
+   "usda_description": "Sauce, chili, peppers, hot, immature green, canned",
+   "per_100g": {
+    "calories": 20.0,
+    "protein": 0.7,
+    "fat": 0.1,
+    "carbs": 5.0,
+    "fiber": 1.9
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以辣椒酱近似"
+  },
+  "豆腐": {
+   "usda_id": 172448,
+   "usda_description": "Tofu, firm, prepared with calcium sulfate and magnesium chloride (nigari)",
+   "per_100g": {
+    "calories": 78.0,
+    "protein": 9.04,
+    "fat": 4.17,
+    "carbs": 2.85,
+    "fiber": 0.9
+   },
+   "default_unit_grams": {
+    "块": 50,
+    "盒": 300
+   },
+   "category": "豆制品",
+   "matched": true
+  },
+  "豆芽": {
+   "usda_id": 169957,
+   "usda_description": "Mung beans, mature seeds, sprouted, raw",
+   "per_100g": {
+    "calories": 30.0,
+    "protein": 3.04,
+    "fat": 0.18,
+    "carbs": 5.94,
+    "fiber": 1.8
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "豆角": {
+   "usda_id": 169961,
+   "usda_description": "Beans, snap, green, raw",
+   "per_100g": {
+    "calories": 31.0,
+    "protein": 1.83,
+    "fat": 0.22,
+    "carbs": 6.97,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "豌豆": {
+   "usda_id": 170419,
+   "usda_description": "Peas, green, raw",
+   "per_100g": {
+    "calories": 81.0,
+    "protein": 5.42,
+    "fat": 0.4,
+    "carbs": 14.45,
+    "fiber": 5.7
+   },
+   "default_unit_grams": {},
+   "category": "蔬菜",
+   "matched": true
+  },
+  "辣椒": {
+   "usda_id": 170106,
+   "usda_description": "Peppers, hot chili, red, raw",
+   "per_100g": {
+    "calories": 40.0,
+    "protein": 1.87,
+    "fat": 0.44,
+    "carbs": 8.81,
+    "fiber": 1.5
+   },
+   "default_unit_grams": {
+    "个": 10,
+    "根": 10,
+    "条": 10
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "辣椒粉": {
+   "usda_id": 170932,
+   "usda_description": "Spices, pepper, red or cayenne",
+   "per_100g": {
+    "calories": 318.0,
+    "protein": 12.01,
+    "fat": 17.27,
+    "carbs": 56.63,
+    "fiber": 27.2
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "酥油": {
+   "usda_id": 171314,
+   "usda_description": "Butter, Clarified butter (ghee)",
+   "per_100g": {
+    "calories": 900.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "油脂",
+   "matched": true
+  },
+  "酱油": {
+   "usda_id": 174277,
+   "usda_description": "Soy sauce made from soy and wheat (shoyu)",
+   "per_100g": {
+    "calories": 53.0,
+    "protein": 8.14,
+    "fat": 0.57,
+    "carbs": 4.93,
+    "fiber": 0.8
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "酵母": {
+   "usda_id": 175043,
+   "usda_description": "Leavening agents, yeast, baker's, active dry",
+   "per_100g": {
+    "calories": 325.0,
+    "protein": 40.44,
+    "fat": 7.61,
+    "carbs": 41.22,
+    "fiber": 26.9
+   },
+   "default_unit_grams": {
+    "茶匙": 3
+   },
+   "category": "膨松剂",
+   "matched": true
+  },
+  "酸奶": {
+   "usda_id": 171284,
+   "usda_description": "Yogurt, plain, whole milk",
+   "per_100g": {
+    "calories": 61.0,
+    "protein": 3.47,
+    "fat": 3.25,
+    "carbs": 4.66,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "杯": 200,
+    "盒": 200
+   },
+   "category": "乳制品",
+   "matched": true
+  },
+  "酸笋": {
+   "usda_id": 169210,
+   "usda_description": "Bamboo shoots, raw",
+   "per_100g": {
+    "calories": 27.0,
+    "protein": 2.6,
+    "fat": 0.3,
+    "carbs": 5.2,
+    "fiber": 2.2
+   },
+   "default_unit_grams": {
+    "根": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "酸菜": {
+   "usda_id": 169279,
+   "usda_description": "Sauerkraut, canned, solids and liquids",
+   "per_100g": {
+    "calories": 19.0,
+    "protein": 0.91,
+    "fat": 0.14,
+    "carbs": 4.28,
+    "fiber": 2.9
+   },
+   "default_unit_grams": {},
+   "category": "蔬菜",
+   "matched": true,
+   "assumption": "东北酸菜以德国酸菜近似"
+  },
+  "醋": {
+   "usda_id": 172237,
+   "usda_description": "Vinegar, distilled",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.04,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "里脊肉": {
+   "usda_id": 168249,
+   "usda_description": "Pork, fresh, loin, tenderloin, separable lean only, raw",
+   "per_100g": {
+    "calories": 109.0,
+    "protein": 20.95,
+    "fat": 2.17,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "畜肉",
+   "matched": true
+  },
+  "金针菇": {
+   "usda_id": 169382,
+   "usda_description": "Mushrooms, enoki, raw",
+   "per_100g": {
+    "calories": 37.0,
+    "protein": 2.66,
+    "fat": 0.29,
+    "carbs": 7.81,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {
+    "袋": 100,
+    "把": 50
+   },
+   "category": "菌菇",
+   "matched": true
+  },
+  "银耳": {
+   "usda_id": 168581,
+   "usda_description": "Fungi, Cloud ears, dried",
+   "per_100g": {
+    "calories": 284.0,
+    "protein": 9.25,
+    "fat": 0.73,
+    "carbs": 73.01,
+    "fiber": 70.1
+   },
+   "default_unit_grams": {},
+   "category": "菌菇",
+   "matched": true,
+   "assumption": "以木耳近似"
+  },
+  "陈醋": {
+   "usda_id": 172237,
+   "usda_description": "Vinegar, distilled",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.04,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "青椒": {
+   "usda_id": 170427,
+   "usda_description": "Peppers, sweet, green, raw",
+   "per_100g": {
+    "calories": 20.0,
+    "protein": 0.86,
+    "fat": 0.17,
+    "carbs": 4.64,
+    "fiber": 1.7
+   },
+   "default_unit_grams": {
+    "个": 50,
+    "根": 50,
+    "条": 50
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "青花椒": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true,
+   "assumption": "以黑胡椒近似"
+  },
+  "青菜": {
+   "usda_id": 170390,
+   "usda_description": "Cabbage, chinese (pak-choi), raw",
+   "per_100g": {
+    "calories": 13.0,
+    "protein": 1.5,
+    "fat": 0.2,
+    "carbs": 2.18,
+    "fiber": 1.0
+   },
+   "default_unit_grams": {
+    "颗": 200,
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "面包": {
+   "usda_id": 174924,
+   "usda_description": "Bread, white, commercially prepared (includes soft bread crumbs)",
+   "per_100g": {
+    "calories": 266.0,
+    "protein": 8.85,
+    "fat": 3.33,
+    "carbs": 49.42,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {
+    "片": 30
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "面条": {
+   "usda_id": 169736,
+   "usda_description": "Pasta, dry, enriched",
+   "per_100g": {
+    "calories": 371.0,
+    "protein": 13.04,
+    "fat": 1.51,
+    "carbs": 74.67,
+    "fiber": 3.2
+   },
+   "default_unit_grams": {},
+   "category": "主食",
+   "matched": true
+  },
+  "面粉": {
+   "usda_id": 168894,
+   "usda_description": "Wheat flour, white, all-purpose, enriched, bleached",
+   "per_100g": {
+    "calories": 364.0,
+    "protein": 10.33,
+    "fat": 0.98,
+    "carbs": 76.31,
+    "fiber": 2.7
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "主食",
+   "matched": true
+  },
+  "韭菜": {
+   "usda_id": 169994,
+   "usda_description": "Chives, raw",
+   "per_100g": {
+    "calories": 30.0,
+    "protein": 3.27,
+    "fat": 0.73,
+    "carbs": 4.35,
+    "fiber": 2.5
+   },
+   "default_unit_grams": {
+    "把": 100
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "食用油": {
+   "usda_id": 171411,
+   "usda_description": "Oil, soybean, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15,
+    "汤匙": 15,
+    "茶匙": 5
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "香叶": {
+   "usda_id": 170917,
+   "usda_description": "Spices, bay leaf",
+   "per_100g": {
+    "calories": 313.0,
+    "protein": 7.61,
+    "fat": 8.36,
+    "carbs": 74.97,
+    "fiber": 26.3
+   },
+   "default_unit_grams": {
+    "片": 0.5,
+    "张": 0.5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "香油": {
+   "usda_id": 171016,
+   "usda_description": "Oil, sesame, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15,
+    "茶匙": 5
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "香草精": {
+   "usda_id": 173471,
+   "usda_description": "Vanilla extract",
+   "per_100g": {
+    "calories": 288.0,
+    "protein": 0.06,
+    "fat": 0.06,
+    "carbs": 12.65,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "茶匙": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "香菇": {
+   "usda_id": 169242,
+   "usda_description": "Mushrooms, shiitake, raw",
+   "per_100g": {
+    "calories": 34.0,
+    "protein": 2.24,
+    "fat": 0.49,
+    "carbs": 6.79,
+    "fiber": 2.5
+   },
+   "default_unit_grams": {
+    "朵": 15,
+    "个": 15
+   },
+   "category": "菌菇",
+   "matched": true
+  },
+  "香菜": {
+   "usda_id": 169997,
+   "usda_description": "Coriander (cilantro) leaves, raw",
+   "per_100g": {
+    "calories": 23.0,
+    "protein": 2.13,
+    "fat": 0.52,
+    "carbs": 3.67,
+    "fiber": 2.8
+   },
+   "default_unit_grams": {
+    "根": 20,
+    "把": 100,
+    "个": 20,
+    "颗": 10
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "香菜粉": {
+   "usda_id": 170922,
+   "usda_description": "Spices, coriander seed",
+   "per_100g": {
+    "calories": 298.0,
+    "protein": 12.37,
+    "fat": 17.77,
+    "carbs": 54.99,
+    "fiber": 41.9
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "香醋": {
+   "usda_id": 172237,
+   "usda_description": "Vinegar, distilled",
+   "per_100g": {
+    "calories": 18.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "carbs": 0.04,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "鱼": {
+   "usda_id": 174191,
+   "usda_description": "Fish, cod, Pacific, raw",
+   "per_100g": {
+    "calories": 69.0,
+    "protein": 15.27,
+    "fat": 0.41,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "条": 500
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "鱼露": {
+   "usda_id": 174531,
+   "usda_description": "Sauce, fish, ready-to-serve",
+   "per_100g": {
+    "calories": 35.0,
+    "protein": 5.06,
+    "fat": 0.01,
+    "carbs": 3.64,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "鲈鱼": {
+   "usda_id": 171948,
+   "usda_description": "Fish, bass, striped, raw",
+   "per_100g": {
+    "calories": 97.0,
+    "protein": 17.73,
+    "fat": 2.33,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "条": 500
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "鲤鱼": {
+   "usda_id": 171952,
+   "usda_description": "Fish, carp, raw",
+   "per_100g": {
+    "calories": 127.0,
+    "protein": 17.83,
+    "fat": 5.6,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "条": 500
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "鳕鱼": {
+   "usda_id": 174191,
+   "usda_description": "Fish, cod, Pacific, raw",
+   "per_100g": {
+    "calories": 69.0,
+    "protein": 15.27,
+    "fat": 0.41,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "片": 120
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "鳗鱼": {
+   "usda_id": 174193,
+   "usda_description": "Fish, eel, mixed species, raw",
+   "per_100g": {
+    "calories": 184.0,
+    "protein": 18.44,
+    "fat": 11.66,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "条": 300
+   },
+   "category": "水产",
+   "matched": true
+  },
+  "鳝丝": {
+   "usda_id": 174193,
+   "usda_description": "Fish, eel, mixed species, raw",
+   "per_100g": {
+    "calories": 184.0,
+    "protein": 18.44,
+    "fat": 11.66,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "水产",
+   "matched": true
+  },
+  "鸡爪": {
+   "usda_id": 171119,
+   "usda_description": "Chicken, feet, boiled",
+   "per_100g": {
+    "calories": 215.0,
+    "protein": 19.4,
+    "fat": 14.6,
+    "carbs": 0.2,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 30,
+    "只": 30
+   },
+   "category": "禽肉",
+   "matched": true
+  },
+  "鸡精": {
+   "usda_id": 171562,
+   "usda_description": "Soup, chicken broth or bouillon, dry",
+   "per_100g": {
+    "calories": 267.0,
+    "protein": 16.66,
+    "fat": 13.88,
+    "carbs": 18.01,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 5,
+    "茶匙": 3
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "鸡翅": {
+   "usda_id": 172390,
+   "usda_description": "Chicken, broilers or fryers, wing, meat and skin, raw",
+   "per_100g": {
+    "calories": 191.0,
+    "protein": 17.52,
+    "fat": 12.85,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 60,
+    "只": 60
+   },
+   "category": "禽肉",
+   "matched": true
+  },
+  "鸡肉": {
+   "usda_id": 171447,
+   "usda_description": "Chicken, broilers or fryers, meat and skin, raw",
+   "per_100g": {
+    "calories": 215.0,
+    "protein": 18.6,
+    "fat": 15.06,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "只": 1200
+   },
+   "category": "禽肉",
+   "matched": true
+  },
+  "鸡胸肉": {
+   "usda_id": 171077,
+   "usda_description": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
+   "per_100g": {
+    "calories": 120.0,
+    "protein": 22.5,
+    "fat": 2.62,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "禽肉",
+   "matched": true
+  },
+  "鸡腿": {
+   "usda_id": 172378,
+   "usda_description": "Chicken, broilers or fryers, leg, meat and skin, raw",
+   "per_100g": {
+    "calories": 214.0,
+    "protein": 16.37,
+    "fat": 15.95,
+    "carbs": 0.17,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 200,
+    "只": 200
+   },
+   "category": "禽肉",
+   "matched": true
+  },
+  "鸡腿肉": {
+   "usda_id": 172378,
+   "usda_description": "Chicken, broilers or fryers, leg, meat and skin, raw",
+   "per_100g": {
+    "calories": 214.0,
+    "protein": 16.37,
+    "fat": 15.95,
+    "carbs": 0.17,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {},
+   "category": "禽肉",
+   "matched": true
+  },
+  "鸡蛋": {
+   "usda_id": 171287,
+   "usda_description": "Egg, whole, raw, fresh",
+   "per_100g": {
+    "calories": 143.0,
+    "protein": 12.56,
+    "fat": 9.51,
+    "carbs": 0.72,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "个": 50,
+    "只": 50,
+    "枚": 50,
+    "颗": 50
+   },
+   "category": "蛋类",
+   "matched": true
+  },
+  "鸭肉": {
+   "usda_id": 172408,
+   "usda_description": "Duck, domesticated, meat and skin, raw",
+   "per_100g": {
+    "calories": 404.0,
+    "protein": 11.49,
+    "fat": 39.34,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "只": 1200
+   },
+   "category": "禽肉",
+   "matched": true
+  },
+  "麻油": {
+   "usda_id": 171016,
+   "usda_description": "Oil, sesame, salad or cooking",
+   "per_100g": {
+    "calories": 884.0,
+    "protein": 0.0,
+    "fat": 100.0,
+    "carbs": 0.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "油脂",
+   "matched": true
+  },
+  "黄油": {
+   "usda_id": 173430,
+   "usda_description": "Butter, without salt",
+   "per_100g": {
+    "calories": 717.0,
+    "protein": 0.85,
+    "fat": 81.11,
+    "carbs": 0.06,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "块": 10,
+    "勺": 14
+   },
+   "category": "乳制品",
+   "matched": true
+  },
+  "黄瓜": {
+   "usda_id": 168409,
+   "usda_description": "Cucumber, with peel, raw",
+   "per_100g": {
+    "calories": 15.0,
+    "protein": 0.65,
+    "fat": 0.11,
+    "carbs": 3.63,
+    "fiber": 0.5
+   },
+   "default_unit_grams": {
+    "根": 200,
+    "个": 200
+   },
+   "category": "蔬菜",
+   "matched": true
+  },
+  "黄豆酱": {
+   "usda_id": 172442,
+   "usda_description": "Miso",
+   "per_100g": {
+    "calories": 198.0,
+    "protein": 12.79,
+    "fat": 6.01,
+    "carbs": 25.37,
+    "fiber": 5.4
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "黄酒": {
+   "usda_id": 167723,
+   "usda_description": "Alcoholic beverage, rice (sake)",
+   "per_100g": {
+    "calories": 134.0,
+    "protein": 0.5,
+    "fat": 0.0,
+    "carbs": 5.0,
+    "fiber": 0.0
+   },
+   "default_unit_grams": {
+    "勺": 15
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "黑胡椒": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  },
+  "黑胡椒粉": {
+   "usda_id": 170931,
+   "usda_description": "Spices, pepper, black",
+   "per_100g": {
+    "calories": 251.0,
+    "protein": 10.39,
+    "fat": 3.26,
+    "carbs": 63.95,
+    "fiber": 25.3
+   },
+   "default_unit_grams": {
+    "勺": 5
+   },
+   "category": "调味",
+   "matched": true
+  }
+ }
+}

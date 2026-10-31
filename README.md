@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/Wangdake00/zhishan-ai-cooking-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Wangdake00/zhishan-ai-cooking-agent/actions/workflows/ci.yml)
 
-> 融合多模态大模型、六阶段 RAG 检索、LangGraph 显式 Agent Workflow、确定性 Grounding 防幻觉与工具调用能力的智能烹饪助手——支持图片识食材、语音输入、菜谱推荐、营养计算、购物清单生成与一键收藏。
+> 融合多模态大模型、六阶段 RAG 检索、LangGraph 显式 Agent Workflow、确定性 Grounding 防幻觉与工具调用能力的智能烹饪助手——支持图片识食材、语音输入、菜谱推荐、营养计算、购物清单生成、一键收藏与跨会话饮食偏好记忆。
 
 ## 项目简介
 
-智膳 AI 是一个面向日常烹饪场景的多模态对话 Agent 应用。用户可以上传食材照片、语音说话或输入文字需求，系统自动识别意图并调用对应工具（菜谱知识库检索、营养计算、购物清单生成、联网搜索、食谱收藏），以流式方式返回结果。
+智膳 AI 是一个面向日常烹饪场景的多模态对话 Agent 应用。用户可以上传食材照片、语音说话或输入文字需求，系统自动识别意图并调用对应工具（菜谱知识库检索、营养计算、购物清单生成、联网搜索、食谱收藏），并在多轮对话间记住用户的忌口、过敏等长期偏好，以流式方式返回结果。
 
 与普通 Demo 的区别在于：本项目不是用 `create_react_agent` 一把梭，而是基于 LangGraph `StateGraph` 手写了**三路显式工作流**，意图路由、工具集、System Prompt 按节点隔离；同时实现了**闭包级用户身份绑定**、**全链路 RAG 降级**、**工具参数双层防幻觉**、**零额外 LLM 调用的确定性输出接地（Grounding）**等工程化设计，并用 **50 条标注评测集 + 4 种消融模式**量化验证检索质量，保证 Agent 在开放式对话中可控、可用、可度量、不越权。
 
@@ -22,6 +22,23 @@
 <details open>
 <summary><b>更新日志（按日期倒序，点击折叠）</b></summary>
 
+- **2026-11-01 - 营养派生标签 + 构建管线确定性修复**
+  - 按整菜营养字段自动派生 5 类标签（`scripts/build_kb.py` `derived_tags()`）：低卡（热量 ≤400 kcal，覆盖 80 条）、高蛋白（蛋白质 ≥40g，128 条）、低脂（脂肪 ≤15g，65 条）、高纤维（纤维 ≥8g，94 条）、高蛋白低脂（≤600 kcal 且蛋白 ≥40g 且脂肪 ≤25g，7 条）；阈值依库内营养分布分位数定标，标签同时进入向量嵌入文本与 metadata，修复"减脂/高蛋白"类查询无语义锚点导致的检索漂移
+  - 新增营养缓存回读：staging 与食材表未变更时 `python scripts/build_kb.py --stage build` 无需 `--usda-dir`，自动从既有 `app/rag/ingredients.json` 回读成分数据；检测到食材变更会报错并提示改用 `--usda-dir` 重建
+  - 修复食材名归一化跨进程漂移：`MATCH_KEYS` 同长度键原先依赖 set 迭代序（受 PYTHONHASHSEED 影响），"干辣椒粉"这类同时命中多键的食材两次构建可能映射到不同条目，现按 `(-长度, 键名)` 排序固定次序，连续构建产物字节级一致
+  - 修复否定约束"不要鸡肉"被泛化"肉"规则吞掉：`extract_constraints` 匹配改为最长触发词优先，并新增精确"鸡肉"规则（排除子串取鸡肉/鸡胸/鸡腿/鸡翅/鸡爪五种真实食材形态；单字"鸡"会误杀 27 道仅用鸡精调味的菜，鸡蛋类天然不含上述子串不受影响）
+- **2026-10-31 - 知识库重建：AI 编造数据 → 可溯源数据**
+  - 菜谱由 100 条 AI 编造替换为 **290 条**真实菜谱，来源 [HowToCook 程序员做饭指南](https://github.com/Anduin2017/HowToCook)（Unlicense），每条带 `source_url` 可回溯原文
+  - 营养数据由 35 项硬编码热量表替换为 **235 项 USDA FoodData Central SR Legacy**（Public Domain）食材条目，按食材可食部克重 × 每 100g 成分值累加计算
+  - 新增可重复构建管线 `scripts/build_kb.py`：解析 HowToCook → `scripts/staging/recipes.jsonl` → 校验（克重覆盖率 / 整菜热量 30~3500 kcal / 宏量折算偏差 ≤35%）→ `app/rag/recipes.json` + `ingredients.json`；`meta.version` 驱动 ChromaDB 启动时自动重建灌入
+  - 用法：`python scripts/build_kb.py --h2c-dir <HowToCook/dishes目录> --usda-dir <SR_Legacy_CSV目录>`；复用已有中间产物仅重建用 `--stage build`
+  - 评测集按菜名重映射到新 ID 并人工补齐，仍为 **50 条**（7 条目标菜不在新库的已逐条修复并经真实检索验证全部命中 Top5：4 条保持原 query 改标新库等价菜；case_06/08/19 因目标食材/标签在新库不存在，query 分别调整为"番茄+牛腩""高蛋白低脂鸡肉""芹菜+牛肉"并标注等价菜，notes 均注明变更原因；10 条负例不变）
+  - 口径说明：菜谱营养字段为**整菜总量**（非每人份）；整菜热量校验上限 3500 kcal 用于拦截计算错误，大份量炖菜/卤味属正常区间
+- **2026-10-31 - 跨会话饮食偏好记忆**
+  - 仅当本轮输入命中显式触发词（"记住""以后""一直""过敏""忌口""不吃""不能吃""别放""不要放""讨厌"）时才抽取偏好，一次性需求不会被误写成长期记忆；抽取调用一次 LLM，类别限定为 忌口 / 过敏 / 目标 / 偏好 / 其他
+  - `user_preferences` 表按 `(user_id, category, content)` 唯一约束幂等 upsert，重复表达只刷新 `updated_at`；每轮取最近 `PREFERENCE_MAX_ITEMS`（默认 20）条拼进三个专家节点的 System Prompt，跨会话生效
+  - 抽取、解析、入库任一环节异常都降级为"无偏好"，主回答不阻塞；新增条数经 `X-Preference-Added` 响应头回传前端
+  - 新增 `GET /api/v1/preferences`、`DELETE /api/v1/preferences/{id}` 与侧边栏"偏好"面板，按 `user_id` 隔离，越权删除返回 404
 - **2026-10-20 - RAG 检索增强 + 评测体系**
   - 新增约束抽取与硬过滤：否定/饮食约束（"不吃辣""清真""低卡"）规则抽取后走 metadata 硬过滤，有硬约束时召回池自动扩容至 ≥50，解决向量空间对否定语义失效的问题
   - 新增 Rerank 相关性阈值拒答（`0.16`）：依据 50 条评测校准——负例 top1 rerank 分全部 ≤0.179、正例最低 0.173，该阈值可拦截 **9/10 负例**，知识库未命中时不再硬塞结果给 LLM，改走"未找到 + 联网兜底"链路
@@ -44,36 +61,56 @@
 
 ## 数据边界 / 免责声明
 
-> - 菜谱知识库内置 **100 道**常见家常菜，覆盖川、粤、鲁、苏、湘、东北等菜系，用于演示 RAG 检索链路；生产环境需扩充至更大规模知识库。
-> - 营养计算基于常见食材每 100g 营养成分表估算，**仅供参考，不构成医学或膳食建议**，特殊饮食需求请咨询专业营养师。
+> - 菜谱知识库内置 **290 道**真实菜谱，来源 [HowToCook 程序员做饭指南](https://github.com/Anduin2017/HowToCook)（Unlicense），每条可经 `source_url` 回溯原文；数据重建与扩充见 `scripts/build_kb.py`。
+> - 营养计算基于 **USDA FoodData Central SR Legacy**（Public Domain）食材成分数据，按可食部克重标准化后累加估算，数值为**整菜总量**口径，**仅供参考，不构成医学或膳食建议**，特殊饮食需求请咨询专业营养师。
 > - 联网搜索结果来自 Tavily，内容质量依赖第三方数据源。
 > - 语音转写由 DashScope Paraformer 提供，识别准确率受环境噪声、口音与麦克风质量影响。
 
 ## 效果展示
 
-**主对话界面**：侧边栏会话管理 + 四大功能入口卡片，支持图片、语音与文本混合输入。
+**主对话界面**：欢迎页展示四张功能入口卡片（拍照识别食材 / 营养成分分析 / 智能购物清单 / 收藏喜欢的食谱），支持图片、语音与文本混合输入。
 
-![对话界面截图](./views/对话界面.png)
+![对话界面](./views/对话界面.png)
 
-**识图推荐菜谱**：上传冰箱食材照片，AI 自动识别并按食材匹配度、难度、营养综合排序推荐菜谱。
+**识图识别食材**：上传冰箱食材照片并提问「这些食材能做什么菜？」，AI 先列出识别出的食材，再给出本地知识库匹配小结（生菜、西兰花命中，秋葵、番茄、花菜、红提未匹配）。
 
-![菜谱识图对话结果](./views/菜谱识图对话结果.png)
+![识图结果](./views/识图结果.png)
 
-**识图热量计算**：识别食材并估算各食材及总热量、蛋白质、脂肪、碳水等营养成分。
+**三梯队菜谱推荐**：基于识别结果输出「本地库直接命中 / 联网补充 / 不建议下厨」三层推荐，并附一桌配餐建议与参考来源清单。
 
-![识图热量计算](./views/识图热量计算.png)
+![识别食材生成结果](./views/识别食材生成结果.png)
 
-**菜谱+热量计算**：在推荐菜谱的同时计算该菜品的营养成分，一站式获取做法与热量信息。
+**识图热量计算**：上传番茄炒蛋成菜照片并要求「帮我计算热量」，AI 先识别食材，再按食材逐项估算热量与蛋白质、脂肪、碳水、纤维。
 
-![菜谱+热量计算](./views/菜谱+热量计算.png)
+![营养计算](./views/营养计算.png)
 
-**智能购物清单**：按食材分类自动整理购物清单，可勾选已购项。
+**营养成分分析报告**：输出逐项明细（番茄 200g、鸡蛋、食用油、白糖等）、总热量 316.5 kcal 与热量结构柱状图，并指出脂肪占比偏高。
 
-![购物清单](./views/购物清单.png)
+![营养计算识别结果 1](./views/营养计算识别结果1.png)
 
-**收藏列表**：一键收藏 AI 推荐的菜谱，随时回顾做法与用料。
+**营养建议 + 权威数据卡**：给出优点、需注意、推荐搭配，末尾附工具计算的权威数据卡与数据校验提示（硬数字不经过 LLM）。
 
-![收藏列表](./views/收藏列表.png)
+![营养计算识别结果 2](./views/营养计算识别结果2.png)
+
+**跨会话偏好记忆**：输入「记住我不吃辣」后，AI 记入长期偏好，并回溯把已收藏的辣版干锅花菜改为不辣版重新收藏，列出替换明细与收藏夹清理建议。
+
+![长期偏好记忆](./views/长期偏好记忆结果.png)
+
+**偏好面板**：侧边栏「偏好」标签列出「不吃辣」，标注「来自对话」「仅你可见 · AI 会在每轮对话中遵守」，可逐条删除。
+
+![偏好面板](./views/新增偏好效果.png)
+
+**偏好联动收藏**：更新偏好后，新收藏的菜谱自动带【适配说明】——已按「不吃辣」全程不加辣椒、花椒，改用蒜香、豆豉、蚝油。
+
+![偏好联动收藏](./views/更新偏好后同步改良收藏菜谱.png)
+
+**收藏详情**：收藏列表可查看收藏时间、主要食材与完整做法，并支持删除。
+
+![收藏页面](./views/收藏页面.png)
+
+**收藏成功回执**：对话中说「帮我收藏干锅花菜的食谱」，AI 返回收藏 ID、要点速览与关键提醒。
+
+![收藏成功回执](./views/收餐食谱.png)
 
 ## 项目亮点
 
@@ -81,6 +118,7 @@
 - **六阶段 RAG 检索 + 全链路降级**：Query 改写（失败回退原 query）→ 约束抽取与净化 → ChromaDB 余弦召回 Top10（失败降级关键字匹配）→ 约束硬过滤 → gte-rerank 精排 Top5（失败降级规则加权打分）→ 偏好微调 + 阈值拒答（top1 < 0.16 判定未命中），未命中自动切换 Tavily 联网搜索兜底
 - **确定性 Grounding 防幻觉**：零额外 LLM 调用，从 `tool_traces` 提取权威事实（营养数值、RAG 实检菜名），正则校验 LLM 回答一致性（总热量偏差 >25% 报警），流末直出工具渲染的"权威数据卡"，硬数字完全不经过 LLM
 - **闭包级用户身份绑定（防越权）**：收藏工具通过闭包在请求进入时锁定真实 `user_id`，工具 schema 完全不暴露该参数，从根源杜绝 LLM 幻觉导致的跨用户收藏；所有会话/收藏接口校验资源所有权
+- **跨会话长期偏好记忆**：命中显式触发词才调用一次 LLM 抽取稳定饮食偏好（类别限定忌口 / 过敏 / 目标 / 偏好 / 其他，内容截断 200 字），按 `(user_id, category, content)` 幂等 upsert 入 `user_preferences`；每轮把最近 20 条偏好追加进各专家节点 System Prompt（"必须优先遵守"），抽取超时或失败一律降级为空，不阻塞主回答
 - **语音 + 多模态输入**：MediaRecorder 录音前端转 WAV 后经 Paraformer 转写回填输入框（复用 DashScope Key 零额外密钥）；支持多图 + 文本同条消息，System Prompt 注入用量常识约束（肉类 80~180g、叶菜 80~200g 等 40+ 品类区间），工具函数内部再 clamp 一层
 - **Reducer + PostgreSQL Checkpoint 多轮持久化**：`Annotated[list, operator.add]` 实现消息追加不覆盖，`AsyncPostgresSaver` 按 `thread_id` 持久化整个状态快照，新请求自动恢复上下文
 - **量化评测驱动检索调优**：50 条标注用例（7 类场景）+ 4 种消融模式对比，Recall@1/3/5、MRR、Hit@5 指标化定位短板类别，阈值 0.16 由评测数据校准而非拍脑袋
@@ -117,7 +155,8 @@
 | RAG 检索层 | `app/rag/pipeline.py`、`app/rag/vector_store.py` | Query 改写、约束抽取/硬过滤、向量召回、Rerank、阈值拒答、全链路降级 |
 | 语音层 | `app/api/v1/voice.py` | 音频上传校验（MIME / 10MB）、Paraformer 转写（线程池执行） |
 | 工具层 | `app/agents/graph.py`（`@tool` 装饰器） | RAG 检索、营养计算、购物清单、联网搜索、用户级收藏（闭包绑定 user_id） |
-| 数据层 | `app/db/` | SQLAlchemy ORM 模型 + 用户、会话、收藏三类异步存储 |
+| 偏好记忆层 | `app/api/v1/preferences.py`、`app/db/preference_store.py` | 显式触发词抽取、幂等 upsert、每轮注入 System Prompt、用户级查看 / 删除 |
+| 数据层 | `app/db/` | SQLAlchemy ORM 模型 + 用户、会话、收藏、偏好四类异步存储 |
 | 评测 | `eval/run_rag_eval.py`、`eval/rag_cases.jsonl` | 50 条标注用例、4 种消融模式、Recall/MRR/Hit 指标 |
 | 前端 | `frontend/` | Next.js 对话界面、SSE 流式渲染、录音转写、OSS 直传 |
 
@@ -164,9 +203,53 @@ flowchart TB
 | PostgreSQL - 用户表 | `app/db/user_store.py` + SQLAlchemy async | 用户名 / 密码哈希 / 注册时间 | 企业级关系型数据库，Alembic 版本化迁移 |
 | PostgreSQL - 会话表 | `app/db/session_store.py` | thread_id 与 user_id 映射、会话标题 | `ON CONFLICT` 原子 upsert，会话列表与权限隔离 |
 | PostgreSQL - 收藏表 | `app/db/favorite_store.py` | 用户收藏的菜谱内容 | 收藏按用户隔离防越权，`(user_id, title)` 唯一约束防重复 |
+| PostgreSQL - 偏好表 | `app/db/preference_store.py` | 跨会话饮食偏好（忌口 / 过敏 / 目标等） | `(user_id, category, content)` 唯一约束幂等 upsert，重复表达只刷新 `updated_at` |
 | PostgreSQL - Checkpoint | `langgraph-checkpoint-postgres` | LangGraph 状态快照（messages / intent / image_urls 等） | 官方 AsyncPostgresSaver，多轮对话自动恢复 |
 | ChromaDB | `db/chroma_data/`（命名卷） | 100 道菜谱的向量索引 + metadata | 本地持久化向量库，显式 `hnsw:space=cosine` 余弦空间 |
 | 阿里云 OSS | 外部服务 | 用户上传的食材图片 | 预签名直传，后端零带宽转发；对象键含 user_id 前缀防覆盖 |
+
+#### 数据模型（ER 图）
+
+```mermaid
+erDiagram
+    USERS ||--o{ SESSIONS : "拥有多个会话"
+    USERS ||--o{ FAVORITES : "收藏菜谱"
+    USERS ||--o{ USER_PREFERENCES : "长期偏好"
+
+    USERS {
+        int id PK
+        string username
+        string password_hash
+        datetime created_at
+    }
+    SESSIONS {
+        string thread_id PK
+        int user_id FK
+        string title
+        datetime created_at
+        datetime updated_at
+    }
+    FAVORITES {
+        int id PK
+        int user_id FK
+        string title
+        text content
+        text ingredients
+        datetime created_at
+        datetime updated_at
+    }
+    USER_PREFERENCES {
+        int id PK
+        int user_id FK
+        string category
+        string content
+        string source
+        datetime created_at
+        datetime updated_at
+    }
+```
+
+> 说明：LangGraph 的 checkpoint / checkpoint_blobs 等表由 `AsyncPostgresSaver.setup()` 自动创建，不经过 Alembic，也不存在指向业务表的外键，因此在 ER 图中单独省略。
 
 ### 核心技术流程 —— 六阶段 RAG 检索
 
@@ -222,6 +305,7 @@ ai私厨/
 │   │   ├── chat.py               # 流式对话 / 历史消息 / 会话 CRUD
 │   │   ├── voice.py              # ★ 语音转写：音频上传校验 + DashScope Paraformer（线程池执行）
 │   │   ├── favorites.py          # 收藏 CRUD（前端手动收藏）
+│   │   ├── preferences.py        # ★ 跨会话饮食偏好：查看 / 删除（按 user_id 隔离）
 │   │   └── oss.py                # OSS 预签名 URL 生成（鉴权 + PUT 上传 + GET 访问）
 │   ├── core/
 │   │   ├── config.py             # Pydantic Settings 统一配置（.env 驱动，生产弱密钥 fail-fast）
@@ -231,10 +315,11 @@ ai私厨/
 │   ├── common/logger.py          # loguru 日志配置
 │   ├── db/
 │   │   ├── database.py           # SQLAlchemy async engine + 会话工厂（pool_pre_ping）
-│   │   ├── models.py             # ORM 模型（users / sessions / favorites，外键 + 唯一约束）
+│   │   ├── models.py             # ORM 模型（users / sessions / favorites / user_preferences）
 │   │   ├── user_store.py         # 用户表异步操作（注册捕获 IntegrityError）
 │   │   ├── session_store.py      # 会话表 + ON CONFLICT 原子 upsert
-│   │   └── favorite_store.py     # 收藏表（按 user_id 隔离）
+│   │   ├── favorite_store.py     # 收藏表（按 user_id 隔离）
+│   │   └── preference_store.py   # ★ 长期偏好表：幂等 upsert、按更新时间取最近 N 条
 │   ├── models/schemas.py         # Pydantic 请求 / 响应模型
 │   ├── rag/
 │   │   ├── pipeline.py           # ★ 六阶段 RAG 检索管道 + 约束过滤 + 阈值拒答 + 全链路降级
@@ -341,6 +426,36 @@ npm run dev
 
 一条命令完成前端构建、后端依赖安装、数据库迁移与 RAG 向量库灌入，适合 Linux 服务器生产部署。
 
+### 运行拓扑
+
+```mermaid
+flowchart LR
+    classDef host fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef container fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef volume fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef external fill:#fce7f3,stroke:#db2777,color:#831843
+
+    B[浏览器]:::host
+
+    subgraph DC["Docker Compose 单机"]
+        APP["app 容器<br/>FastAPI + 前端静态产物<br/>uvicorn 监听 8001"]:::container
+        PG["postgres 容器<br/>postgres:17-alpine"]:::container
+        V1[(chroma_data 命名卷)]:::volume
+        V2[(postgres_data 命名卷)]:::volume
+        APP -->|服务名 postgres 内网 5432| PG
+        APP --- V1
+        PG --- V2
+    end
+
+    B -->|HTTP 与 SSE 宿主端口 8001| APP
+    B -.->|预签名 PUT 直传| OSS["阿里云 OSS"]:::external
+    APP -->|Embedding Rerank ASR LLM| DS["阿里云百炼 DashScope"]:::external
+    APP -->|联网搜索兜底| TV["Tavily"]:::external
+    APP -->|预签名访问| OSS
+```
+
+要点：前端静态产物由 FastAPI 同源托管，只有 app 容器对外暴露 8001；postgres 端口仅绑定 `127.0.0.1:5432`，容器间通过服务名 `postgres` 走内部网络。
+
 ### 前置条件
 
 - 服务器已安装 Docker 20.10+ 与 Docker Compose v2（`docker compose version` 可用）
@@ -431,6 +546,10 @@ LLM_MODEL=qwen3.5-plus            # 对话与多模态模型
 LLM_TIMEOUT_SECONDS=120
 LLM_MAX_RETRIES=2
 
+# ========== 跨会话长期偏好记忆 ==========
+PREFERENCE_MEMORY_ENABLED=true     # 关闭后不再抽取 / 注入偏好
+PREFERENCE_MAX_ITEMS=20            # 每轮注入 System Prompt 的偏好条数上限
+
 # ========== RAG / ChromaDB ==========
 CHROMA_DB_DIR=db/chroma_data
 CHROMA_COLLECTION_NAME=recipes
@@ -489,6 +608,8 @@ OSS_ENDPOINT=oss-cn-shenzhen.aliyuncs.com
 | GET | `/api/v1/favorites` | 列出当前用户所有收藏 | 是 |
 | GET | `/api/v1/favorites/{favorite_id}` | 获取单条收藏详情 | 是 |
 | DELETE | `/api/v1/favorites/{favorite_id}` | 删除收藏 | 是 |
+| GET | `/api/v1/preferences` | 列出当前用户被记住的饮食偏好 | 是 |
+| DELETE | `/api/v1/preferences/{preference_id}` | 删除一条饮食偏好（越权返回 404） | 是 |
 | GET | `/health` | 健康检查（服务状态、版本） | 否 |
 | GET | `/health/ready` | 就绪探针（校验 PostgreSQL，失败返回 503） | 否 |
 
@@ -565,3 +686,43 @@ flowchart TD
 6. **Grounding 校验**：流结束后从 `tool_traces` 提取权威事实——营养卡（总热量/蛋白/脂肪/碳水 + 未收录食材）与菜谱清单卡由工具事实直接渲染；LLM 回答中"总热量"与工具计算偏差 >25% 时追加校正提示，回答未引用任何实检菜名时提示以清单为准
 7. **流式输出**：`graph.astream(..., stream_mode="messages", durability="sync")` 逐 chunk yield，FastAPI `StreamingResponse` 以 `text/event-stream` 推送
 8. **状态持久化**：`AsyncPostgresSaver` Checkpoint 按 `thread_id` 自动保存整个 state，下次请求带同一 `thread_id` 自动恢复历史上下文
+
+### 防幻觉 Grounding 数据流
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant API as 流式接口
+    participant G as StateGraph
+    participant T as 工具与 LLM
+    participant GD as grounding.py
+
+    U->>API: POST /chat/stream（JWT + thread_id）
+    API->>G: search_recipes(prompt, images, user_id, preferences)
+    G->>T: 工具循环（LLM 自主决定调用，最多 5 轮）
+    T-->>G: 结构化事实写入 nutrition_facts / recipe_facts
+    G->>G: 每个 superstep 同步写 Checkpoint
+    G-->>API: 逐 token yield 正文
+    API-->>U: SSE 流式正文
+
+    Note over API,GD: 流式正文结束后进入接地阶段
+
+    API->>G: 从 Checkpoint 读取 nutrition_facts / recipe_facts
+    API->>GD: extract_nutrition_facts / extract_recipe_facts
+    GD->>GD: verify_nutrition / verify_recipes 正则与集合比对
+    GD-->>API: 权威数据卡 + 偏差提示（总热量偏差 >25%）
+    API-->>U: 追加数据卡与校正提示
+```
+
+设计要点：接地只读取工具已经产出的事实，不额外调用 LLM，因此是零成本的确定性校验；即使接地阶段抛异常也会被吞掉，绝不影响主回答输出。
+
+### 跨会话偏好记忆链路
+
+1. **触发判定**：请求进入后先由 `prepare_turn_preferences()` 检查本轮输入是否命中显式触发词（记住 / 以后 / 一直 / 从来 / 过敏 / 忌口 / 不吃 / 不能吃 / 别放 / 不要放 / 讨厌）；未命中直接跳过，不产生额外 LLM 调用
+2. **抽取入库**：命中后调用一次 LLM 输出 JSON 数组，类别限定为 忌口 / 过敏 / 目标 / 偏好 / 其他，内容截断 200 字；按 `(user_id, category, content)` 唯一约束 upsert，重复表达只刷新 `updated_at`
+3. **注入**：读取该用户最近 `PREFERENCE_MAX_ITEMS`（默认 20）条偏好，渲染成「【用户长期偏好（跨会话记忆，必须优先遵守）】- [类别] 内容」追加到三个专家节点的 System Prompt，跨会话生效
+4. **回传前端**：抽取在流开始前完成，新增条数通过 `X-Preference-Added` 响应头返回；前端弹出「已记住 N 条新偏好 · 查看」，并刷新侧边栏"偏好"面板
+5. **降级**：LLM 超时、JSON 解析失败、数据库写入异常均返回空偏好并记告警日志，主回答不阻塞；`PREFERENCE_MEMORY_ENABLED=false` 可整体关闭
+
+> 只记"稳定约束"，一次性需求（如"今天想吃清淡点"）不写入长期记忆——用显式触发词而非全量抽取，既避免误记，也避免每轮多一次 LLM 调用的开销。
